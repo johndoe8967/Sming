@@ -7,7 +7,7 @@
 #define OUT_PIN 2 // GPIO2
 
 HttpServer server;
-//FTPServer ftp;
+FTPServer ftp;
 
 BssList networks;
 String network, password;
@@ -38,9 +38,16 @@ void onSwitch(HttpRequest &request, HttpResponse &response)
 {
 	if (request.getRequestMethod() == RequestMethod::POST)
 	{
+		debugf("POST Set Data");
 		if (request.getPostParameter("switch") == "1") {
 			digOutlet->changeState(manualSwitch_On);
+		} else {
+			digOutlet->changeState(manualSwitch_Off);
 		}
+		AppSettings.timeZone = request.getPostParameter("timeZone").toInt();
+		AppSettings.switchOffTime = request.getPostParameter("switchOffTime").toInt();
+		AppSettings.maxOnTime = request.getPostParameter("maxOnTime").toInt();
+		AppSettings.save();
 	}
 
 	TemplateFileStream *tmpl = new TemplateFileStream("switch.html");
@@ -48,6 +55,10 @@ void onSwitch(HttpRequest &request, HttpResponse &response)
 
 	vars["switchon"] = (digOutlet->getState()==SwitchedOn) ? "checked='checked'" : "";
 	vars["switchoff"] = (digOutlet->getState()==SwitchedOff) ? "checked='checked'" : "";
+
+	vars["maxOnTime"] = String(AppSettings.maxOnTime);
+	vars["switchOffTime"] = String(AppSettings.switchOffTime);
+	vars["timeZone"] = String(AppSettings.timeZone);
 
 	response.sendTemplate(tmpl); // will be automatically deleted
 }
@@ -193,13 +204,13 @@ void startWebServer()
 	server.listen(80);
 	server.addPath("/", onIndex);
 	server.addPath("/ipconfig", onIpConfig);
-	server.addPath("/switch", onIpConfig);
+	server.addPath("/switch", onSwitch);
 	server.addPath("/ajax/get-networks", onAjaxNetworkList);
 	server.addPath("/ajax/connect", onAjaxConnect);
 	server.setDefaultHandler(onFile);
 }
 
-/*void startFTP()
+void startFTP()
 {
 	if (!fileExist("index.html"))
 		fileSetContent("index.html", "<h3>Please connect to FTP and upload files from folder 'web/build' (details in code)</h3>");
@@ -207,7 +218,7 @@ void startWebServer()
 	// Start FTP server
 	ftp.listen(21);
 	ftp.addUser("me", "123"); // FTP account
-}*/
+}
 
 
 void outletWorker() {
@@ -217,7 +228,7 @@ void outletWorker() {
 // Will be called when system initialization was completed
 void startServers()
 {
-//	startFTP();
+	startFTP();
 	startWebServer();
 	digOutlet = new DigitalOutlet(OUT_PIN);
 	workOutletTimer=outletWorker;
@@ -238,15 +249,26 @@ void networkScanCompleted(bool succeeded, BssList list)
 
 
 void wifiAccessibilityWorker() {
+	debugf("check for configuration network");
 	if (!WifiStation.isConnected()) {
+		debugf("WifiStation not connected");
 		// Start AP for configuration
 		if (!WifiAccessPoint.isEnabled()) {
+			debugf("AP not enabled");
 			WifiAccessPoint.enable(true);
 			WifiAccessPoint.config("Sming Configuration", "", AUTH_OPEN);
+			WifiStation.enable(false);
+			debugf("enable AP");
 		}
 	} else {
 		// Stop AP for configuration
-		if (WifiAccessPoint.isEnabled()) WifiAccessPoint.enable(false);
+		debugf("WifiStation is connected");
+		if (WifiAccessPoint.isEnabled()) {
+			debugf("AP is enabled");
+			WifiAccessPoint.enable(false);
+			WifiStation.enable(false);
+			debugf("disable AP");
+		}
 	}
 }
 
@@ -275,6 +297,7 @@ void init()
 	AppSettings.load();
 
 	WifiStation.enable(true);
+	WifiAccessPoint.enable(false);
 
 	if (AppSettings.exist())
 	{

@@ -6,11 +6,13 @@
  */
 
 #include "DigitalOutlet.h"
+#define OUT_PIN 2 // GPIO2
+
 
 
 void DigitalOutlet::initOutlet(){
-	pinMode(pin, OUTPUT);
-	digitalWrite(pin, digOutletState==SwitchedOn);
+	pinMode(OUT_PIN, OUTPUT);
+	digitalWrite(OUT_PIN, digOutletState==SwitchedOn);
 }
 DigitalOutlet::DigitalOutlet():pin(0) {
 	calcSwitchOffTimeStamp();
@@ -55,10 +57,10 @@ void DigitalOutlet::changeState(DIGOUTLETTRANS trans) {
 	case deviceDetect_On:
 		digOutletState = SwitchedOn;
 		break;
+
 	case maxOnTimeout_Off:
-		digOutletState = SwitchedOff;
-		break;
 	case switchOffTime_Off:
+	case manualSwitch_Off:
 		digOutletState = SwitchedOff;
 		break;
 	default:
@@ -86,7 +88,15 @@ void DigitalOutlet::outletWorker() {
 		break;
 	}
 
-	digitalWrite(pin, digOutletState==SwitchedOn);
+	if(digOutletState==SwitchedOn) {
+		debugf("set output");
+		digitalWrite(OUT_PIN, 1);
+	} else {
+		debugf("clear output");
+		digitalWrite(OUT_PIN, 0);
+	}
+
+	//digitalWrite(pin, digOutletState==SwitchedOn);
 }
 
 

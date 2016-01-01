@@ -17,8 +17,8 @@ ESP_HOME = /opt/esp-open-sdk
 # SMING_HOME = c:/tools/sming/Sming 
 
 # MacOS / Linux
-# SMING_HOME = /opt/sming/Sming
-SMING_HOME = /Users/johndoe/Projects/Sming/Sming
+ SMING_HOME = /opt/sming/Sming
+#SMING_HOME = /Users/johndoe/Projects/Sming/Sming
 ESPTOOL2 = $(ESP_HOME)/esptool2/esptool2
 
 ## COM port parameter is reqruied to flash firmware correctly.
@@ -27,6 +27,7 @@ ESPTOOL2 = $(ESP_HOME)/esptool2/esptool2
 
 # MacOS / Linux:
 # COM_PORT = /dev/tty.usbserial
+COM_PORT = /dev/ttyAMA0 
 
 # Com port speed
 # COM_SPEED	= 115200
