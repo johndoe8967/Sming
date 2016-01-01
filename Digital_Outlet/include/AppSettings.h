@@ -1,7 +1,7 @@
 /*
  * AppSettings.h
  *
- *  Created on: 13 мая 2015 г.
+ *  Created on: 13 пїЅпїЅпїЅ 2015 пїЅ.
  *      Author: Anakod
  */
 
@@ -22,6 +22,10 @@ struct ApplicationSettingsStorage
 	IPAddress ip;
 	IPAddress netmask;
 	IPAddress gateway;
+	uint32 maxOnTime = 3600;
+	time_t switchOffTime;
+	uint8 timeZone = 2;
+
 
 	void load()
 	{
@@ -34,6 +38,8 @@ struct ApplicationSettingsStorage
 			JsonObject& root = jsonBuffer.parseObject(jsonString);
 
 			JsonObject& network = root["network"];
+			JsonObject& digOutlet = root["digOutlet"];
+
 			ssid = network["ssid"].asString();
 			password = network["password"].asString();
 
@@ -42,6 +48,16 @@ struct ApplicationSettingsStorage
 			ip = network["ip"].asString();
 			netmask = network["netmask"].asString();
 			gateway = network["gateway"].asString();
+
+			String stringValue;
+			stringValue = digOutlet["maxOnTime"].asString();
+			maxOnTime = stringValue.toInt();
+
+			stringValue = digOutlet["switchOffTime"].asString();
+			switchOffTime = stringValue.toInt();
+
+			stringValue = digOutlet["timeZone"].asString();
+			timeZone = stringValue.toInt();
 
 			delete[] jsonString;
 		}
@@ -53,7 +69,9 @@ struct ApplicationSettingsStorage
 		JsonObject& root = jsonBuffer.createObject();
 
 		JsonObject& network = jsonBuffer.createObject();
+		JsonObject& digOutlet = jsonBuffer.createObject();
 		root["network"] = network;
+		root["digOutlet"] = digOutlet;
 		network["ssid"] = ssid.c_str();
 		network["password"] = password.c_str();
 
@@ -63,6 +81,10 @@ struct ApplicationSettingsStorage
 		network["ip"] = ip.toString();
 		network["netmask"] = netmask.toString();
 		network["gateway"] = gateway.toString();
+
+		digOutlet["maxOnTime"] = String(maxOnTime);
+		digOutlet["switchOffTime"] = String(switchOffTime);
+		digOutlet["timeZone"] = String(timeZone);
 
 		//TODO: add direct file stream writing
 		String rootString;

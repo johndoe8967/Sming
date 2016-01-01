@@ -1,21 +1,30 @@
 #include <user_config.h>
 #include <SmingCore/SmingCore.h>
 #include <AppSettings.h>
+#include "DigitalOutlet.h"
+#include "NtpClientDelegateDemo.h"
 
 #define OUT_PIN 2 // GPIO2
 
 HttpServer server;
-FTPServer ftp;
+//FTPServer ftp;
 
 BssList networks;
 String network, password;
 Timer connectionTimer;
 
-bool state = false;
 bool deviceAvailable = false;
-int timeout=0;
+
+Timer wifiStatusTimer;
+TimerDelegate wifiStatusWorker;
+
+DigitalOutlet *digOutlet;
 Timer outletTimer;
 TimerDelegate workOutletTimer;
+
+ntpClientDemo *ntp;
+
+
 
 
 void onIndex(HttpRequest &request, HttpResponse &response)
@@ -29,14 +38,16 @@ void onSwitch(HttpRequest &request, HttpResponse &response)
 {
 	if (request.getRequestMethod() == RequestMethod::POST)
 	{
-		state = request.getPostParameter("switch") == "1";
+		if (request.getPostParameter("switch") == "1") {
+			digOutlet->changeState(manualSwitch_On);
+		}
 	}
 
 	TemplateFileStream *tmpl = new TemplateFileStream("switch.html");
 	auto &vars = tmpl->variables();
 
-	vars["switchon"] = state ? "checked='checked'" : "";
-	vars["switchoff"] = !state ? "checked='checked'" : "";
+	vars["switchon"] = (digOutlet->getState()==SwitchedOn) ? "checked='checked'" : "";
+	vars["switchoff"] = (digOutlet->getState()==SwitchedOff) ? "checked='checked'" : "";
 
 	response.sendTemplate(tmpl); // will be automatically deleted
 }
@@ -188,7 +199,7 @@ void startWebServer()
 	server.setDefaultHandler(onFile);
 }
 
-void startFTP()
+/*void startFTP()
 {
 	if (!fileExist("index.html"))
 		fileSetContent("index.html", "<h3>Please connect to FTP and upload files from folder 'web/build' (details in code)</h3>");
@@ -196,42 +207,22 @@ void startFTP()
 	// Start FTP server
 	ftp.listen(21);
 	ftp.addUser("me", "123"); // FTP account
-}
+}*/
 
 
-
-// check if smartphone is logged in the network OR if switched on by web
-// 		enable outlet
-// else
-//		wait 10min
-//		disable outlet
 void outletWorker() {
-	if ((state == true) || (deviceAvailable)) {
-		digitalWrite(OUT_PIN, true);
-		timeout = 600;
-	} else {
-		if (timeout==0) {
-			digitalWrite(OUT_PIN, false);
-		} else {
-			timeout--;
-		}
-	}
-}
-
-void initOutlet(){
-	pinMode(OUT_PIN, OUTPUT);
-	digitalWrite(OUT_PIN, state);
-	workOutletTimer=outletWorker;
-	outletTimer.initializeMs(1000,workOutletTimer).start();
-
+	digOutlet->outletWorker();
 }
 
 // Will be called when system initialization was completed
 void startServers()
 {
-	startFTP();
+//	startFTP();
 	startWebServer();
-	initOutlet();
+	digOutlet = new DigitalOutlet(OUT_PIN);
+	workOutletTimer=outletWorker;
+	outletTimer.initializeMs(1000,workOutletTimer).start();
+
 }
 
 void networkScanCompleted(bool succeeded, BssList list)
@@ -243,6 +234,36 @@ void networkScanCompleted(bool succeeded, BssList list)
 				networks.add(list[i]);
 	}
 	networks.sort([](const BssInfo& a, const BssInfo& b){ return b.rssi - a.rssi; } );
+}
+
+
+void wifiAccessibilityWorker() {
+	if (!WifiStation.isConnected()) {
+		// Start AP for configuration
+		if (!WifiAccessPoint.isEnabled()) {
+			WifiAccessPoint.enable(true);
+			WifiAccessPoint.config("Sming Configuration", "", AUTH_OPEN);
+		}
+	} else {
+		// Stop AP for configuration
+		if (WifiAccessPoint.isEnabled()) WifiAccessPoint.enable(false);
+	}
+}
+
+
+// Will be called when WiFi station was connected to AP
+void connectOk()
+{
+	if(ntp) {
+		delete ntp;
+	}
+	ntp = new ntpClientDemo();
+}
+// Will be called when WiFi station timeout was reached
+void connectFail()
+{
+	debugf("I'm NOT CONNECTED!");
+	WifiStation.waitConnection(connectOk, 10, connectFail); // Repeat and check again
 }
 
 void init()
@@ -264,10 +285,16 @@ void init()
 
 	WifiStation.startScan(networkScanCompleted);
 
-	// Start AP for configuration
-	WifiAccessPoint.enable(true);
-	WifiAccessPoint.config("Sming Configuration", "", AUTH_OPEN);
+	wifiStatusWorker = wifiAccessibilityWorker;
+	wifiStatusTimer.initializeMs(10000,wifiStatusWorker).start();
+
+	// set timezone hourly difference to UTC
+	SystemClock.setTimeZone(AppSettings.timeZone);
+
 
 	// Run WEB server on system ready
 	System.onReady(startServers);
+
+	// Run our method when station was connected to AP (or not connected)
+	WifiStation.waitConnection(connectOk, 30, connectFail); // We recommend 20+ seconds at start
 }
