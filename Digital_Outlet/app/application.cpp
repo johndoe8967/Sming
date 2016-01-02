@@ -3,6 +3,7 @@
 #include <AppSettings.h>
 #include "DigitalOutlet.h"
 #include "NtpClientDelegateDemo.h"
+#include "mqtt.h"
 
 #define OUT_PIN 2 // GPIO2
 
@@ -24,7 +25,7 @@ TimerDelegate workOutletTimer;
 
 ntpClientDemo *ntp;
 
-
+MqttStringSubscriptionCallback mqttCallback;
 
 
 void onIndex(HttpRequest &request, HttpResponse &response)
@@ -222,8 +223,26 @@ void startFTP()
 
 
 void outletWorker() {
+	static bool prevValue=digOutlet->getState();
+	bool actValue;
 	digOutlet->outletWorker();
+	if (prevValue != actValue) {
+		publishMqttMessage(actValue);
+		prevValue = actValue;
+	}
 }
+
+// Callback for messages, arrived from MQTT server
+void onMqttMessageReceived(String topic, String message)
+{
+	Serial.print(topic);
+	Serial.print(":\r\n\t"); // Prettify alignment for printing
+	Serial.println(message);
+//	digOutlet->changeState(mqttSwitch_On);
+//	digOutlet->changeState(mqttSwitch_Off);
+
+}
+
 
 // Will be called when system initialization was completed
 void startServers()
@@ -234,6 +253,8 @@ void startServers()
 	workOutletTimer=outletWorker;
 	outletTimer.initializeMs(1000,workOutletTimer).start();
 
+	mqttCallback = onMqttMessageReceived;
+	startMqttClient(mqttCallback);
 }
 
 void networkScanCompleted(bool succeeded, BssList list)

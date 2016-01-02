@@ -13,7 +13,7 @@
 
 
 enum DIGOUTLETSTATE {SwitchedOff, SwitchedOn};
-enum DIGOUTLETTRANS {none, manualSwitch_On, deviceDetect_On, manualSwitch_Off, maxOnTimeout_Off, switchOffTime_Off};
+enum DIGOUTLETTRANS {none, manualSwitch_On, deviceDetect_On, mqttSwitch_On, mqttSwitch_Off, manualSwitch_Off, maxOnTimeout_Off, switchOffTime_Off};
 
 
 class DigitalOutlet {
