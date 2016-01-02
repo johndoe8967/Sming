@@ -6,26 +6,25 @@
  */
 
 #include "DigitalOutlet.h"
-#define OUT_PIN 2 // GPIO2
-
-
 
 void DigitalOutlet::initOutlet(){
-	pinMode(OUT_PIN, OUTPUT);
-	digitalWrite(OUT_PIN, digOutletState==SwitchedOn);
+	pinMode(pin, OUTPUT);
+	digitalWrite(pin, digOutletState==SwitchedOn);
 }
 DigitalOutlet::DigitalOutlet():pin(0) {
 	calcSwitchOffTimeStamp();
+	initOutlet();
 }
 
 DigitalOutlet::DigitalOutlet(unsigned char pin) {
 	this->pin = pin;
 	calcSwitchOffTimeStamp();
+	initOutlet();
 }
 
 
 DigitalOutlet::~DigitalOutlet() {
-	// TODO Auto-generated destructor stub
+	pinMode(pin, INPUT);
 }
 
 void DigitalOutlet::calcSwitchOffTimeStamp() {
@@ -90,10 +89,10 @@ void DigitalOutlet::outletWorker() {
 
 	if(digOutletState==SwitchedOn) {
 		debugf("set output");
-		digitalWrite(OUT_PIN, 1);
+		digitalWrite(pin, 1);
 	} else {
 		debugf("clear output");
-		digitalWrite(OUT_PIN, 0);
+		digitalWrite(pin, 0);
 	}
 
 	//digitalWrite(pin, digOutletState==SwitchedOn);
