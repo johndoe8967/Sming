@@ -22,8 +22,9 @@ struct ApplicationSettingsStorage
 	IPAddress ip;
 	IPAddress netmask;
 	IPAddress gateway;
-	uint32 maxOnTime = 3600;
+	uint32 maxOnTime;
 	time_t switchOffTime;
+	time_t switchOnTime;
 	uint8 timeZone = 2;
 
 
@@ -52,6 +53,9 @@ struct ApplicationSettingsStorage
 			String stringValue;
 			stringValue = digOutlet["maxOnTime"].asString();
 			maxOnTime = stringValue.toInt();
+
+			stringValue = digOutlet["switchOnTime"].asString();
+			switchOnTime = stringValue.toInt();
 
 			stringValue = digOutlet["switchOffTime"].asString();
 			switchOffTime = stringValue.toInt();
@@ -83,6 +87,7 @@ struct ApplicationSettingsStorage
 		network["gateway"] = gateway.toString();
 
 		digOutlet["maxOnTime"] = String(maxOnTime);
+		digOutlet["switchOnTime"] = String(switchOnTime);
 		digOutlet["switchOffTime"] = String(switchOffTime);
 		digOutlet["timeZone"] = String(timeZone);
 
@@ -95,6 +100,6 @@ struct ApplicationSettingsStorage
 	bool exist() { return fileExist(APP_SETTINGS_FILE); }
 };
 
-static ApplicationSettingsStorage AppSettings;
+extern ApplicationSettingsStorage AppSettings;
 
 #endif /* INCLUDE_APPSETTINGS_H_ */

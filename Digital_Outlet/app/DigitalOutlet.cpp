@@ -13,12 +13,14 @@ void DigitalOutlet::initOutlet(){
 }
 DigitalOutlet::DigitalOutlet():pin(0) {
 	calcSwitchOffTimeStamp();
+	calcSwitchOnTimeStamp();
 	initOutlet();
 }
 
 DigitalOutlet::DigitalOutlet(unsigned char pin) {
 	this->pin = pin;
 	calcSwitchOffTimeStamp();
+	calcSwitchOnTimeStamp();
 	initOutlet();
 }
 
@@ -27,27 +29,46 @@ DigitalOutlet::~DigitalOutlet() {
 	pinMode(pin, INPUT);
 }
 
-void DigitalOutlet::calcSwitchOffTimeStamp() {
-	DateTime now = SystemClock.now(eTZ_UTC);
-	time_t switchOffTime = AppSettings.switchOffTime;
+time_t DigitalOutlet::calcNextSwitchTimeStamp(time_t time) {
+	DateTime now = SystemClock.now(eTZ_Local);
+	if ((time < 86400) && (time > 0)) {
 
-	now.Hour = switchOffTime/3600;
-	switchOffTime %= 3600;
-	now.Minute = switchOffTime / 60;
-	switchOffTime %= 60;
-	now.Second = switchOffTime;
+		now.Hour = time/3600;
+		time %= 3600;
+		now.Minute = time / 60;
+		time %= 60;
+		now.Second = time;
 
-	if (SystemClock.now(eTZ_UTC)>now) {
-		now.Day++;
+		if (SystemClock.now(eTZ_Local)>now) {
+			now.Day++;
+		}
+		Serial.print("SwitchTime: ");
+		Serial.println(now);
+
+		return now.toUnixTime();
+	} else {
+		Serial.println("invalid Time");
+		return 0x7fffffff;
 	}
+}
 
-	switchOffTimeStamp = now.toUnixTime();
+
+void DigitalOutlet::calcSwitchOffTimeStamp() {
+	switchOffTimeStamp = calcNextSwitchTimeStamp(AppSettings.switchOffTime);
+}
+void DigitalOutlet::calcSwitchOnTimeStamp() {
+	switchOnTimeStamp = calcNextSwitchTimeStamp(AppSettings.switchOnTime);
 }
 
 void DigitalOutlet::changeState(DIGOUTLETTRANS trans) {
 	switch (trans) {
 	case manualSwitch_On:
+	case mqttSwitch_On:
+	case switchOnTime_On:
+		Serial.print("Get maxOnTime: ");
+		Serial.println(AppSettings.maxOnTime);
 		timeout = AppSettings.maxOnTime;
+
 		calcSwitchOffTimeStamp();
 		digOutletState = SwitchedOn;
 		break;
@@ -60,6 +81,8 @@ void DigitalOutlet::changeState(DIGOUTLETTRANS trans) {
 	case maxOnTimeout_Off:
 	case switchOffTime_Off:
 	case manualSwitch_Off:
+	case mqttSwitch_Off:
+		calcSwitchOnTimeStamp();
 		digOutletState = SwitchedOff;
 		break;
 	default:
@@ -72,6 +95,12 @@ void DigitalOutlet::outletWorker() {
 
 	switch (digOutletState) {
 	case SwitchedOff:
+		if (SystemClock.now(eTZ_UTC).toUnixTime() > switchOnTimeStamp) {
+			Serial.print("SwitchOnTime: ");
+			Serial.println(switchOnTimeStamp);
+			changeState(switchOnTime_On);
+		}
+
 		break;
 	case SwitchedOn:
 		if (--timeout == 0) {
@@ -79,6 +108,8 @@ void DigitalOutlet::outletWorker() {
 		}
 
 		if (SystemClock.now(eTZ_UTC).toUnixTime() > switchOffTimeStamp) {
+			Serial.print("SwitchOffTime: ");
+			Serial.println(switchOnTimeStamp);
 			changeState(switchOffTime_Off);
 		}
 
@@ -87,16 +118,7 @@ void DigitalOutlet::outletWorker() {
 		break;
 	}
 
-	if(digOutletState==SwitchedOn) {
-		debugf("set output");
-		digitalWrite(pin, 1);
-	} else {
-		debugf("clear output");
-		digitalWrite(pin, 0);
-	}
+	digitalWrite(pin, digOutletState==SwitchedOn);
 
-	//digitalWrite(pin, digOutletState==SwitchedOn);
 }
-
-
 

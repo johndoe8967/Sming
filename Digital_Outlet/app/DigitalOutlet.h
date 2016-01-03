@@ -13,7 +13,7 @@
 
 
 enum DIGOUTLETSTATE {SwitchedOff, SwitchedOn};
-enum DIGOUTLETTRANS {none, manualSwitch_On, deviceDetect_On, mqttSwitch_On, mqttSwitch_Off, manualSwitch_Off, maxOnTimeout_Off, switchOffTime_Off};
+enum DIGOUTLETTRANS {none, manualSwitch_On, deviceDetect_On, mqttSwitch_On,switchOnTime_On, mqttSwitch_Off, manualSwitch_Off, maxOnTimeout_Off, switchOffTime_Off};
 
 
 class DigitalOutlet {
@@ -24,15 +24,19 @@ public:
 	void outletWorker();
 	void changeState(DIGOUTLETTRANS trans);
 	DIGOUTLETSTATE getState() {return digOutletState;}
+	int getRemainingTime() {return timeout;}
 
 private:
 	void initOutlet();
 	void calcSwitchOffTimeStamp();
+	void calcSwitchOnTimeStamp();
+	time_t calcNextSwitchTimeStamp(time_t time);
 
 	unsigned char pin;
 	DIGOUTLETSTATE digOutletState = SwitchedOff;
 
 	time_t switchOffTimeStamp;
+	time_t switchOnTimeStamp;
 	int timeout=0;
 
 };

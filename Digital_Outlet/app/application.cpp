@@ -26,6 +26,7 @@ TimerDelegate workOutletTimer;
 ntpClientDemo *ntp;
 
 MqttStringSubscriptionCallback mqttCallback;
+ApplicationSettingsStorage AppSettings;
 
 
 void onIndex(HttpRequest &request, HttpResponse &response)
@@ -47,7 +48,11 @@ void onSwitch(HttpRequest &request, HttpResponse &response)
 		}
 		AppSettings.timeZone = request.getPostParameter("timeZone").toInt();
 		AppSettings.switchOffTime = request.getPostParameter("switchOffTime").toInt();
+		AppSettings.switchOnTime = request.getPostParameter("switchOnTime").toInt();
 		AppSettings.maxOnTime = request.getPostParameter("maxOnTime").toInt();
+		Serial.print("Set maxOnTime: ");
+		Serial.println(AppSettings.maxOnTime);
+
 		AppSettings.save();
 	}
 
@@ -58,7 +63,9 @@ void onSwitch(HttpRequest &request, HttpResponse &response)
 	vars["switchoff"] = (digOutlet->getState()==SwitchedOff) ? "checked='checked'" : "";
 
 	vars["maxOnTime"] = String(AppSettings.maxOnTime);
+	vars["remainingTime"] = String(digOutlet->getRemainingTime());
 	vars["switchOffTime"] = String(AppSettings.switchOffTime);
+	vars["switchOnTime"] = String(AppSettings.switchOnTime);
 	vars["timeZone"] = String(AppSettings.timeZone);
 
 	response.sendTemplate(tmpl); // will be automatically deleted
@@ -223,24 +230,41 @@ void startFTP()
 
 
 void outletWorker() {
-	static bool prevValue=digOutlet->getState();
+	static bool prevValue;
 	bool actValue;
+
 	digOutlet->outletWorker();
+	actValue = digOutlet->getState();
+
+/*	Serial.print("worker ActValue: ");
+	Serial.print(actValue);
+	Serial.print(" PrevValue: ");
+	Serial.println(prevValue);*/
+
 	if (prevValue != actValue) {
-		publishMqttMessage(actValue);
+//		Serial.println("Publish");
 		prevValue = actValue;
+		publishMqttMessage(actValue);
 	}
 }
 
 // Callback for messages, arrived from MQTT server
 void onMqttMessageReceived(String topic, String message)
 {
-	Serial.print(topic);
-	Serial.print(":\r\n\t"); // Prettify alignment for printing
-	Serial.println(message);
-//	digOutlet->changeState(mqttSwitch_On);
-//	digOutlet->changeState(mqttSwitch_Off);
+	if (topic.compareTo(actorTopic)==0) {
+		debugf("got actor message");
 
+		DynamicJsonBuffer jsonBuffer;
+		JsonObject& root = jsonBuffer.parseObject(message);
+		String state = root["state"].asString();
+		if (state.toInt() == 0) {
+			digOutlet->changeState(mqttSwitch_Off);
+			debugf("Off");
+		} else {
+			digOutlet->changeState(mqttSwitch_On);
+			debugf("On");
+		}
+	}
 }
 
 
@@ -270,25 +294,18 @@ void networkScanCompleted(bool succeeded, BssList list)
 
 
 void wifiAccessibilityWorker() {
-	debugf("check for configuration network");
 	if (!WifiStation.isConnected()) {
-		debugf("WifiStation not connected");
 		// Start AP for configuration
 		if (!WifiAccessPoint.isEnabled()) {
-			debugf("AP not enabled");
 			WifiAccessPoint.enable(true);
 			WifiAccessPoint.config("Sming Configuration", "", AUTH_OPEN);
 			WifiStation.enable(false);
-			debugf("enable AP");
 		}
 	} else {
 		// Stop AP for configuration
-		debugf("WifiStation is connected");
 		if (WifiAccessPoint.isEnabled()) {
-			debugf("AP is enabled");
 			WifiAccessPoint.enable(false);
 			WifiStation.enable(false);
-			debugf("disable AP");
 		}
 	}
 }

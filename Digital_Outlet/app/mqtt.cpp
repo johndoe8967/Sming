@@ -14,7 +14,7 @@ void restartMqttClient()
 //		debugf("Unable to set the last will and testament. Most probably there is not enough memory on the device.");
 //	}
 	mqtt->connect("esp8266");
-	mqtt->subscribe("/a/a9c96ed3-6c55-49de-b5d6-252b641a0c08/p/6305/d/78217324-f049-43ed-be9c-e2b3474f17ca/actuator/DigitalOutlet/state");
+	mqtt->subscribe(actorTopic);
 
 }
 
@@ -25,8 +25,10 @@ void publishMqttMessage(bool value)
 		restartMqttClient(); // Auto reconnect
 
 	Serial.println("Let's publish message now!");
-	String data = "{\"value\":0}";
-	mqtt->publish("/a/a9c96ed3-6c55-49de-b5d6-252b641a0c08/p/6305/d/78217324-f049-43ed-be9c-e2b3474f17ca/sensor/Door/data", data); // or publishWithQoS
+	String data = "{\"value\":";
+	data += String(value);
+	data += "}";
+	mqtt->publish(sensorTopic, data); // or publishWithQoS
 }
 
 
