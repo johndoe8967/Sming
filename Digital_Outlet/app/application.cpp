@@ -36,20 +36,59 @@ void onIndex(HttpRequest &request, HttpResponse &response)
 	response.sendTemplate(tmpl); // will be automatically deleted
 }
 
+
+time_t getTimeFromString(String time) {
+	int min;
+	int hour;
+
+	int pos = time.indexOf(':');
+	Serial.print("get Time from String: ");
+	Serial.print(time);
+	Serial.print(" pos of ':' ");
+	Serial.print(pos);
+
+	time_t unixTime;
+
+	if (pos >= 0) {
+		Serial.print(" ':' detected ");
+		hour = time.substring(0,pos).toInt();
+		min = time.substring(pos+1).toInt();
+		unixTime = hour*3600+min*60;
+		Serial.println (unixTime);
+		return unixTime;
+	} else {
+		Serial.print(" no ':' detected ");
+		unixTime = time.toInt();
+		Serial.println(unixTime);
+		return unixTime;
+	}
+}
+
+String getStringFromTime(time_t time) {
+	String stringTime;
+	time /= 60;
+	stringTime = String(time/60);
+	time %= 60;
+	stringTime += ":";
+	stringTime += String(time);
+	return stringTime;
+}
+
 void onSwitch(HttpRequest &request, HttpResponse &response)
 {
 	if (request.getRequestMethod() == RequestMethod::POST)
 	{
 		debugf("POST Set Data");
+		AppSettings.timeZone = request.getPostParameter("timeZone").toInt();
+		SystemClock.setTimeZone(AppSettings.timeZone);
+		AppSettings.switchOffTime = getTimeFromString(request.getPostParameter("switchOffTime"));
+		AppSettings.switchOnTime = getTimeFromString(request.getPostParameter("switchOnTime"));
+		AppSettings.maxOnTime = request.getPostParameter("maxOnTime").toInt();
 		if (request.getPostParameter("switch") == "1") {
 			digOutlet->changeState(manualSwitch_On);
 		} else {
 			digOutlet->changeState(manualSwitch_Off);
 		}
-		AppSettings.timeZone = request.getPostParameter("timeZone").toInt();
-		AppSettings.switchOffTime = request.getPostParameter("switchOffTime").toInt();
-		AppSettings.switchOnTime = request.getPostParameter("switchOnTime").toInt();
-		AppSettings.maxOnTime = request.getPostParameter("maxOnTime").toInt();
 		Serial.print("Set maxOnTime: ");
 		Serial.println(AppSettings.maxOnTime);
 
@@ -64,8 +103,8 @@ void onSwitch(HttpRequest &request, HttpResponse &response)
 
 	vars["maxOnTime"] = String(AppSettings.maxOnTime);
 	vars["remainingTime"] = String(digOutlet->getRemainingTime());
-	vars["switchOffTime"] = String(AppSettings.switchOffTime);
-	vars["switchOnTime"] = String(AppSettings.switchOnTime);
+	vars["switchOffTime"] = getStringFromTime(AppSettings.switchOffTime);
+	vars["switchOnTime"] = getStringFromTime(AppSettings.switchOnTime);
 	vars["timeZone"] = String(AppSettings.timeZone);
 
 	response.sendTemplate(tmpl); // will be automatically deleted

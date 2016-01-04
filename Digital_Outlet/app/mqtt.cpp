@@ -25,10 +25,10 @@ void publishMqttMessage(bool value)
 		restartMqttClient(); // Auto reconnect
 
 	Serial.println("Let's publish message now!");
-	String data = "{\"value\":";
+	String data = "{\"state\":";
 	data += String(value);
 	data += "}";
-	mqtt->publish(sensorTopic, data); // or publishWithQoS
+	mqtt->publish(actorTopic, data); // or publishWithQoS
 }
 
 

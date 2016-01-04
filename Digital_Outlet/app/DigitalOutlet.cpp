@@ -39,11 +39,15 @@ time_t DigitalOutlet::calcNextSwitchTimeStamp(time_t time) {
 		time %= 60;
 		now.Second = time;
 
-		if (SystemClock.now(eTZ_Local)>now) {
+		if (SystemClock.now(eTZ_Local).toUnixTime() > now.toUnixTime()) {
+			Serial.print("SwitchTime in the past, add a day: ");
+			Serial.println(now);
 			now.Day++;
 		}
 		Serial.print("SwitchTime: ");
-		Serial.println(now);
+		Serial.print(now);
+		Serial.print(" ActTime: ");
+		Serial.println(SystemClock.now(eTZ_Local).toUnixTime());
 
 		return now.toUnixTime();
 	} else {
@@ -92,10 +96,18 @@ void DigitalOutlet::changeState(DIGOUTLETTRANS trans) {
 
 void DigitalOutlet::outletWorker() {
 
+/*	Serial.print("SwitchOnTime: ");
+	Serial.print(switchOnTimeStamp);
+	Serial.print(" SwitchOffTime: ");
+	Serial.print(switchOffTimeStamp);
+	Serial.print(" ActTime: ");
+	Serial.println(SystemClock.now(eTZ_Local).toUnixTime());*/
+
+
 
 	switch (digOutletState) {
 	case SwitchedOff:
-		if (SystemClock.now(eTZ_UTC).toUnixTime() > switchOnTimeStamp) {
+		if (SystemClock.now(eTZ_Local).toUnixTime() > switchOnTimeStamp) {
 			Serial.print("SwitchOnTime: ");
 			Serial.println(switchOnTimeStamp);
 			changeState(switchOnTime_On);
@@ -107,9 +119,9 @@ void DigitalOutlet::outletWorker() {
 			changeState(maxOnTimeout_Off);
 		}
 
-		if (SystemClock.now(eTZ_UTC).toUnixTime() > switchOffTimeStamp) {
+		if (SystemClock.now(eTZ_Local).toUnixTime() > switchOffTimeStamp) {
 			Serial.print("SwitchOffTime: ");
-			Serial.println(switchOnTimeStamp);
+			Serial.println(switchOffTimeStamp);
 			changeState(switchOffTime_Off);
 		}
 
