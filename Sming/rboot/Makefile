@@ -4,7 +4,6 @@
 #
 
 ESPTOOL2 ?= ../esptool2/esptool2
-SDK_BASE ?= /opt/esp-open-sdk/sdk
 
 RBOOT_BUILD_BASE ?= build
 RBOOT_FW_BASE    ?= firmware
@@ -18,8 +17,8 @@ LD := $(addprefix $(XTENSA_BINDIR)/,xtensa-lx106-elf-gcc)
 endif
 
 CFLAGS    = -Os -O3 -Wpointer-arith -Wundef -Werror -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH
-LDFLAGS   = -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static -L $(SDK_BASE)/ld/
-LD_SCRIPT = $(SDK_BASE)/ld/eagle.app.v6.ld
+LDFLAGS   = -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
+LD_SCRIPT = eagle.app.v6.ld
 
 E2_OPTS = -quiet -bin -boot0
 
@@ -40,6 +39,24 @@ else ifeq ($(SPI_SIZE), 2M)
 else ifeq ($(SPI_SIZE), 4M)
 	E2_OPTS += -4096
 endif
+ifeq ($(SPI_MODE), qio)
+	E2_OPTS += -qio
+else ifeq ($(SPI_MODE), dio)
+	E2_OPTS += -dio
+else ifeq ($(SPI_MODE), qout)
+	E2_OPTS += -qout
+else ifeq ($(SPI_MODE), dout)
+	E2_OPTS += -dout
+endif
+ifeq ($(SPI_SPEED), 20)
+	E2_OPTS += -20
+else ifeq ($(SPI_MODE), 26)
+	E2_OPTS += -26.7
+else ifeq ($(SPI_MODE), 40)
+	E2_OPTS += -40
+else ifeq ($(SPI_MODE), 80)
+	E2_OPTS += -80
+endif
 
 RBOOT_EXTRA_INCDIR := $(addprefix -I,$(RBOOT_EXTRA_INCDIR))
 
@@ -56,14 +73,14 @@ $(RBOOT_FW_BASE):
 
 $(RBOOT_BUILD_BASE)/rboot-stage2a.o: rboot-stage2a.c rboot-private.h rboot.h
 	@echo "CC $<"
-	$(CC) $(CFLAGS) $(RBOOT_EXTRA_INCDIR) -c $< -o $@
+	@$(CC) $(CFLAGS) $(RBOOT_EXTRA_INCDIR) -c $< -o $@
 	
 $(RBOOT_BUILD_BASE)/rboot-stage2a.elf: $(RBOOT_BUILD_BASE)/rboot-stage2a.o
 	@echo "LD $@"
 	@$(LD) -Trboot-stage2a.ld $(LDFLAGS) -Wl,--start-group $^ -Wl,--end-group -o $@
 
 $(RBOOT_BUILD_BASE)/rboot-hex2a.h: $(RBOOT_BUILD_BASE)/rboot-stage2a.elf
-	@echo "FW $@"
+	@echo "E2 $@"
 	@$(ESPTOOL2) -quiet -header $< $@ .text
 
 $(RBOOT_BUILD_BASE)/rboot.o: rboot.c rboot-private.h rboot.h $(RBOOT_BUILD_BASE)/rboot-hex2a.h
@@ -79,7 +96,7 @@ $(RBOOT_BUILD_BASE)/%.elf: $(RBOOT_BUILD_BASE)/%.o
 	@$(LD) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $^ -Wl,--end-group -o $@
 
 $(RBOOT_FW_BASE)/%.bin: $(RBOOT_BUILD_BASE)/%.elf
-	@echo "FW $@"
+	@echo "E2 $@"
 	@$(ESPTOOL2) $(E2_OPTS) $< $@ .text .rodata
 
 clean:

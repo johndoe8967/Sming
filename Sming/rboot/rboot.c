@@ -170,7 +170,7 @@ uint32 NOINLINE find_image() {
 	uint32 flashsize;
 	int32 romToBoot;
 	uint8 gpio_boot = FALSE;
-	uint8 updateConfig = TRUE;
+	uint8 updateConfig = FALSE;
 	uint8 buffer[SECTOR_SIZE];
 
 	rboot_config *romconf = (rboot_config*)buffer;
@@ -281,6 +281,7 @@ uint32 NOINLINE find_image() {
 		ets_printf("Booting GPIO-selected.\r\n");
 		romToBoot = romconf->gpio_rom;
 		gpio_boot = TRUE;
+		updateConfig = TRUE;
 	} else if (romconf->current_rom >= romconf->count) {
 		// if invalid rom selected try rom 0
 		ets_printf("Invalid rom selected, defaulting.\r\n");
