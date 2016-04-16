@@ -85,8 +85,9 @@ public:
 
 	/**	@brief	Enable / disable WiFi station
 	 *	@param	enabled True to enable station. False to disable.
+	 *	@param	save True to save operational mode to flash, False to set current operational mode only
      */
-	void enable(bool enabled);
+	void enable(bool enabled, bool save = false);
 
 	/**	@brief	Get WiFi station enable status
 	 *	@retval	bool True if WiFi station enabled
@@ -99,6 +100,10 @@ public:
 	 *	@param	autoConnectOnStartup True to auto connect. False for manual. (Default: True)
 	 */
 	bool config(String ssid, String password, bool autoConnectOnStartup = true);
+
+	/**	@brief	Connect WiFi station to network
+	 */
+	void connect();
 
 	/**	@brief	Disconnect WiFi station from network
 	 */
@@ -133,6 +138,16 @@ public:
 	 *	@param	enable True to enable WiFi station DHCP
 	 */
 	void enableDHCP(bool enable);
+
+	/**	@brief	Set WiFi station DHCP hostname
+	 *	@param	hostname - WiFi station DHCP hostname
+	 */
+	void setHostname(String hostname);
+
+	/**	@brief	Set WiFi station DHCP hostname
+	 *	@retval WiFi station DHCP hostname
+	 */
+	String getHostname();
 
 	/**	@brief	Get WiFi station IP address
 	 *	@retval	IPAddress IP address of WiFi station

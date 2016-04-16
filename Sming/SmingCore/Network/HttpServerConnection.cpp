@@ -58,9 +58,9 @@ err_t HttpServerConnection::onReceive(pbuf *buf)
 
 			String contType = request.getContentType();
 			contType.toLowerCase();
-			if (request.getContentLength() > 0 && contType.indexOf(ContentType::FormUrlEncoded) != -1)
+			if (request.getContentLength() > 0 && request.getRequestMethod() == RequestMethod::POST)
 				state = eHCS_ParsePostData;
-			else
+					else
 				state = eHCS_ParsingCompleted;
 		}
 	}
@@ -87,7 +87,6 @@ err_t HttpServerConnection::onReceive(pbuf *buf)
 		}
 	}
 
-	// Fire callbacks
 	TcpConnection::onReceive(buf);
 
 	return ERR_OK;

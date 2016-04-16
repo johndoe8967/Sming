@@ -35,8 +35,9 @@ public:
 
     /** @brief  Enable or disable WiFi AP
      *  @param  enabled True to enable AP. False to disable.
+     *  @param	save True to save operational mode to flash, False to set current operational mode only
      */
-	void enable(bool enabled);
+	void enable(bool enabled, bool save = false);
 
     /** @brief  Get WiFi AP enable status
      *  @retval bool True if WiFi AP enabled.
@@ -85,6 +86,15 @@ public:
      */
 	IPAddress getNetworkBroadcast();
 
+	/**	@brief	Get WiFi access point SSID
+	 *	@retval	String WiFi access point SSID
+	 */
+	String getSSID();
+
+	/**	@brief	Get WiFi access point password
+	 *	@retval	String WiFi access point password
+	 */
+	String getPassword();
     /** @} */
 
 protected:

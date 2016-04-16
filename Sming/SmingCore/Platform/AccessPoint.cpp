@@ -16,11 +16,14 @@ AccessPointClass::AccessPointClass()
 	runConfig = NULL;
 }
 
-void AccessPointClass::enable(bool enabled)
+void AccessPointClass::enable(bool enabled, bool save)
 {
 	uint8 mode = wifi_get_opmode() & ~SOFTAP_MODE;
 	if (enabled) mode |= SOFTAP_MODE;
-	wifi_set_opmode(mode);
+	if (save)
+		wifi_set_opmode(mode);
+	else
+		wifi_set_opmode_current(mode);
 }
 
 bool AccessPointClass::isEnabled()
@@ -137,6 +140,30 @@ String AccessPointClass::getMAC()
 		mac += String(hwaddr[i], HEX);
 	}
 	return mac;
+}
+
+String AccessPointClass::getSSID()
+{
+	softap_config config = {0};
+	if (!wifi_softap_get_config(&config))
+	{
+		debugf("Can't read station configuration!");
+		return "";
+	}
+	debugf("SSID: %s", (char*)config.ssid);
+	return String((char*)config.ssid);
+}
+
+String AccessPointClass::getPassword()
+{
+	softap_config config = {0};
+	if (!wifi_softap_get_config(&config))
+	{
+		debugf("Can't read station configuration!");
+		return "";
+	}
+	debugf("Pass: %s", (char*)config.password);
+	return String((char*)config.password);
 }
 
 void AccessPointClass::onSystemReady()

@@ -26,11 +26,14 @@ StationClass::~StationClass()
 	connectionTimer = NULL;
 }
 
-void StationClass::enable(bool enabled)
+void StationClass::enable(bool enabled, bool save)
 {
 	uint8 mode = wifi_get_opmode() & ~STATION_MODE;
 	if (enabled) mode |= STATION_MODE;
-	wifi_set_opmode(mode);
+	if (save)
+		wifi_set_opmode(mode);
+	else
+		wifi_set_opmode_current(mode);
 }
 
 bool StationClass::isEnabled()
@@ -82,6 +85,11 @@ bool StationClass::config(String ssid, String password, bool autoConnectOnStartu
 	return true;
 }
 
+void StationClass::connect()
+{
+	wifi_station_connect();
+}
+
 void StationClass::disconnect()
 {
 	wifi_station_disconnect();
@@ -113,6 +121,16 @@ void StationClass::enableDHCP(bool enable)
 		wifi_station_dhcpc_start();
 	else
 		wifi_station_dhcpc_stop();
+}
+
+void StationClass::setHostname(String hostname)
+{
+	wifi_station_set_hostname((char*)hostname.c_str());
+}
+
+String StationClass::getHostname()
+{
+	return (String) wifi_station_get_hostname();
 }
 
 IPAddress StationClass::getIP()
