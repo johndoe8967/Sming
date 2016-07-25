@@ -91,7 +91,6 @@ uint8_t TwoWire::requestFrom(int address, int quantity, bool sendStop /* = true*
 	rxLen = 0;
 
 	if (!master->start(((uint8_t)(address << 1)) | I2C_READ)) return 0; // received NACK on transmit of address
-	delay(1);
 
 	for (int i = 0; i < quantity; i++)
 		rxBuf[rxLen++] = master->read(quantity == i + 1);

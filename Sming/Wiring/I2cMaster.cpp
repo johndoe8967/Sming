@@ -100,6 +100,7 @@ bool SoftI2cMaster::start(uint8_t addressRW) {
   digitalWrite(sdaPin_, LOW);
   delayMicroseconds(I2C_DELAY_USEC);
   digitalWrite(sclPin_, LOW);
+  delay(1);
   return write(addressRW);
 }
 //------------------------------------------------------------------------------
