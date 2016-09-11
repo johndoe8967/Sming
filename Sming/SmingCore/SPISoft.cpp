@@ -15,11 +15,38 @@ Descr: Implement software SPI. To improve speed, GPIO16 is not supported(see Dig
 #define GP_OUT(pin, val) GPIO_REG_WRITE(((((val) != LOW) ? \
 							GPIO_OUT_W1TS_ADDRESS : \
 							GPIO_OUT_W1TC_ADDRESS)), ((uint16_t)1<<(pin)))
+#define CPHA1
+#define CPOL1
+
+#ifdef CPHA1
+
+#ifdef CPOL1
+#define SCK_PULSE	GP_OUT(mCLK, LOW); \
+					fastDelay(m_delay); \
+					GP_OUT(mCLK, HIGH); \
+					fastDelay(m_delay);
+#endif
+#ifdef CPOL0
 #define SCK_PULSE	GP_OUT(mCLK, HIGH); \
 					fastDelay(m_delay); \
 					GP_OUT(mCLK, LOW); \
 					fastDelay(m_delay);
-
+#endif
+#endif
+#ifdef CPHA0
+#ifdef CPOL1
+#define SCK_PULSE	fastDelay(m_delay); \
+					GP_OUT(mCLK, LOW); \
+					fastDelay(m_delay); \
+					GP_OUT(mCLK, HIGH);
+#endif
+#ifdef CPOL0
+#define SCK_PULSE	fastDelay(m_delay); \
+					GP_OUT(mCLK, HIGH); \
+					fastDelay(m_delay); \
+					GP_OUT(mCLK, LOW);
+#endif
+#endif
 static inline void IRAM_ATTR fastDelay(unsigned d)
 {
 	while(d) --d;
@@ -27,7 +54,7 @@ static inline void IRAM_ATTR fastDelay(unsigned d)
 
 void SPISoft::begin()
 {
-	if(16 == mMISO || 16 == mMOSI || 16 == mCLK)
+	if(16 == mMISO || 16 == mMOSI || 16 == mCLK || 16 == mCS )
 	{
 		/*To be able to use fast/simple GPIO read/write GPIO16 is not supported*/
 		debugf("SPISoft: GPIO 16 not supported\n");
@@ -35,12 +62,20 @@ void SPISoft::begin()
 	}
 
 	pinMode(mCLK, OUTPUT);
+#ifdef CPOL0
 	digitalWrite(mCLK, LOW);
+#endif
+#ifdef CPOL1
+	digitalWrite(mCLK, HIGH);
+#endif
 
 	pinMode(mMISO, INPUT);
 	digitalWrite(mMISO, HIGH);
 
 	pinMode(mMOSI, OUTPUT);
+
+	pinMode(mCS, OUTPUT);
+	digitalWrite(mCS, HIGH);
 }
 
 void SPISoft::transfer(uint8_t* buffer, uint32_t size)
@@ -50,6 +85,9 @@ void SPISoft::transfer(uint8_t* buffer, uint32_t size)
 	do {
 		d = *buffer; r=0;
 
+#ifdef CPHA1
+		SCK_PULSE
+#endif
 		GP_OUT(mMOSI, d & 0x80);	/* bit7 */
 		r = 		 GP_IN(mMISO); //bit 7
 		SCK_PULSE
@@ -73,8 +111,10 @@ void SPISoft::transfer(uint8_t* buffer, uint32_t size)
 		SCK_PULSE
 		GP_OUT(mMOSI, d & 0x01);	/* bit0 */
 		r = r << 1 | GP_IN(mMISO); //bit 0
+#ifdef CPHA0
 		SCK_PULSE
-
+#endif
+		delayMicroseconds(m_byte_delay);
 		*buffer++ = r;
 	} while (--size);
 }
