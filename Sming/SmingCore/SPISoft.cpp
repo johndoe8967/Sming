@@ -22,9 +22,15 @@ Descr: Implement software SPI. To improve speed, GPIO16 is not supported(see Dig
 
 #ifdef CPOL1
 #define SCK_PULSE	GP_OUT(mCLK, LOW); \
+					delayMicroseconds(1); \
+					GP_OUT(mCLK, HIGH); \
+					delayMicroseconds(1);
+
+#define SCK_PULSEfast	GP_OUT(mCLK, LOW); \
 					fastDelay(m_delay); \
 					GP_OUT(mCLK, HIGH); \
 					fastDelay(m_delay);
+
 #endif
 #ifdef CPOL0
 #define SCK_PULSE	GP_OUT(mCLK, HIGH); \
@@ -86,30 +92,36 @@ void SPISoft::transfer(uint8_t* buffer, uint32_t size)
 		d = *buffer; r=0;
 
 #ifdef CPHA1
+		GP_OUT(mMOSI, d & 0x80);	/* bit7 */
 		SCK_PULSE
 #endif
-		GP_OUT(mMOSI, d & 0x80);	/* bit7 */
 		r = 		 GP_IN(mMISO); //bit 7
-		SCK_PULSE
 		GP_OUT(mMOSI, d & 0x40);	/* bit6 */
+		SCK_PULSE
+
+		GP_OUT(mMOSI, d & 0x20);	/* bit5 */
 		r = r << 1 | GP_IN(mMISO); //bit 6
 		SCK_PULSE
-		GP_OUT(mMOSI, d & 0x20);	/* bit5 */
+
+		GP_OUT(mMOSI, d & 0x10);	/* bit4 */
 		r = r << 1 | GP_IN(mMISO); //bit 5
 		SCK_PULSE
-		GP_OUT(mMOSI, d & 0x10);	/* bit4 */
+
+		GP_OUT(mMOSI, d & 0x08);	/* bit3 */
 		r = r << 1 | GP_IN(mMISO); //bit 4
 		SCK_PULSE
-		GP_OUT(mMOSI, d & 0x08);	/* bit3 */
+
+		GP_OUT(mMOSI, d & 0x04);	/* bit2 */
 		r = r << 1 | GP_IN(mMISO); //bit 3
 		SCK_PULSE
-		GP_OUT(mMOSI, d & 0x04);	/* bit2 */
+
+		GP_OUT(mMOSI, d & 0x02);	/* bit1 */
 		r = r << 1 | GP_IN(mMISO); //bit 2
 		SCK_PULSE
-		GP_OUT(mMOSI, d & 0x02);	/* bit1 */
+
+		GP_OUT(mMOSI, d & 0x01);	/* bit0 */
 		r = r << 1 | GP_IN(mMISO); //bit 1
 		SCK_PULSE
-		GP_OUT(mMOSI, d & 0x01);	/* bit0 */
 		r = r << 1 | GP_IN(mMISO); //bit 0
 #ifdef CPHA0
 		SCK_PULSE
