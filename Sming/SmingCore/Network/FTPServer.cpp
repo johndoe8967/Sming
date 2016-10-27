@@ -30,13 +30,17 @@ TcpConnection* FTPServer::createClient(tcp_pcb *clientTcp)
 
 void FTPServer::addUser(String login, String pass)
 {
+#ifdef debug
 	debugf("addUser: %s %s", login.c_str(), pass.c_str());
+#endif
 	users[login] = pass;
 }
 
 bool FTPServer::checkUser(String login, String pass)
 {
+#ifdef debug
 	debugf("checkUser: %s %s", login.c_str(), pass.c_str());
+#endif
 	if (!users.contains(login))
 		return false;
 

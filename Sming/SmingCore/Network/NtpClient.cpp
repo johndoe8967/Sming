@@ -72,7 +72,9 @@ void NtpClient::requestTime()
 		//debugf("DNS IP lookup in progress.");
 		break;
 	default:
+#ifdef debug
 		debugf("DNS lookup error occurred.");
+#endif
 		break;
 	}
 }

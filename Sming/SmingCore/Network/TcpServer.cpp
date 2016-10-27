@@ -56,11 +56,13 @@ TcpConnection* TcpServer::createClient(tcp_pcb *clientTcp)
 {
 	if (clientTcp == NULL)
 	{
+#ifdef debug
 		debugf("TCP Server createClient NULL\r\n");
 	}
 	else
 	{
 		debugf("TCP Server createClient not NULL");
+#endif
 	}
 
 	TcpConnection* con = new TcpClient(clientTcp,
@@ -73,12 +75,16 @@ TcpConnection* TcpServer::createClient(tcp_pcb *clientTcp)
 //Timer stateTimer;
 void list_mem()
 {
+#ifdef debug
 	debugf("Free heap size=%d, K=%d", system_get_free_heap_size(), TcpServer::totalConnections);
-}
+#endif
+	}
 
 void TcpServer::setTimeOut(uint16_t waitTimeOut)
 {
+#ifdef debug
 	debugf("Server timeout updating: %d -> %d", timeOut, waitTimeOut);
+#endif
 	timeOut = waitTimeOut;
 }
 
@@ -102,12 +108,16 @@ err_t TcpServer::onAccept(tcp_pcb *clientTcp, err_t err)
 	// Anti DDoS :-)
 	if (system_get_free_heap_size() < 6500)
 	{
+#ifdef debug
 		debugf("\r\n\r\nCONNECTION DROPPED\r\n\t(%d)\r\n\r\n", system_get_free_heap_size());
+#endif
 		return ERR_MEM;
 	}
 
 	#ifdef NETWORK_DEBUG
+#ifdef debug
 	debugf("onAccept state: %d K=%d", err, totalConnections);
+#endif
 	list_mem();
 	#endif
 
@@ -128,7 +138,9 @@ err_t TcpServer::onAccept(tcp_pcb *clientTcp, err_t err)
 void TcpServer::onClient(TcpClient *client)
 {
 	activeClients++;
+#ifdef debug
 	debugf("TcpServer onClient: %s\r\n", client->getRemoteIp().toString().c_str());
+#endif
 	if (clientConnectDelegate)
 	{
 		clientConnectDelegate(client);
@@ -138,7 +150,9 @@ void TcpServer::onClient(TcpClient *client)
 void TcpServer::onClientComplete(TcpClient& client, bool succesfull)
 {
 	activeClients--;
+#ifdef debug
 	debugf("TcpSever onComplete: %s\r\n", client.getRemoteIp().toString().c_str());
+#endif
 	if (clientCompleteDelegate)
 	{
 		clientCompleteDelegate(client,succesfull);
@@ -147,8 +161,10 @@ void TcpServer::onClientComplete(TcpClient& client, bool succesfull)
 
 bool TcpServer::onClientReceive (TcpClient& client, char *data, int size)
 {
+#ifdef debug
 	debugf("TcpSever onReceive: %s, %d bytes\r\n", client.getRemoteIp().toString().c_str(), size);
 	debugf("Data: %s", data);
+#endif
 	if (clientReceiveDelegate)
 	{
 		return clientReceiveDelegate(client, data, size);
@@ -163,7 +179,9 @@ err_t TcpServer::staticAccept(void *arg, tcp_pcb *new_tcp, err_t err)
 
 	if (con == NULL)
 	{
+#ifdef debug
 		debugf("NO CONNECTION ON TCP");
+#endif
 		//closeTcpConnection(new_tcp);
 		tcp_abort(new_tcp);
 		return ERR_ABRT;

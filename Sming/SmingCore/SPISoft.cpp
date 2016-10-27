@@ -63,7 +63,9 @@ void SPISoft::begin()
 	if(16 == mMISO || 16 == mMOSI || 16 == mCLK || 16 == mCS )
 	{
 		/*To be able to use fast/simple GPIO read/write GPIO16 is not supported*/
+#ifdef debug
 		debugf("SPISoft: GPIO 16 not supported\n");
+#endif
 		return;
 	}
 

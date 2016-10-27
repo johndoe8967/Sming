@@ -55,7 +55,9 @@ public:
 	{
 		if (completed) return;
 		Vector<String> list = fileList();
+#ifdef debug
 		debugf("send file list: %d", list.count());
+#endif
 		for (int i = 0; i < list.count(); i++)
 			writeString("01-01-15  01:00AM               " + String(fileGetSize(list[i])) + " " + list[i] + "\r\n");
 		completed = true;
@@ -167,7 +169,9 @@ err_t FTPServerConnection::onReceive(pbuf *buf)
 		}
 		else
 			cmd = NetUtils::pbufStrCopy(buf, prev, p - prev);
+#ifdef debug
 		debugf("%s: '%s'", cmd.c_str(), data.c_str());
+#endif
 		onCommand(cmd, data);
 		prev = p + 1;
 	};
@@ -191,7 +195,9 @@ void FTPServerConnection::cmdPort(const String& data)
 	int p1 = ps1.toInt();
 	int p2 = ps2.toInt();
 	port = (p1 << 8) | p2;
+#ifdef debug
 	debugf("connection to: %s, %d", ip.toString().c_str(), port);
+#endif
 	response(200);
 }
 
@@ -236,7 +242,7 @@ void FTPServerConnection::onCommand(String cmd, String data)
 	{
 		if (cmd == "SYST")
 		{
-			response(215, "Windows_NT: Sming Framework"); // Why not? It's look like Windows :)
+			response(215, "Windows_NT: Sming"); // Why not? It's look like Windows :)
 		}
 		else if (cmd == "PWD")
 		{
@@ -313,7 +319,9 @@ void FTPServerConnection::onCommand(String cmd, String data)
 		return;
 	}
 
+#ifdef debug
 	debugf("!!!CASE NOT IMPLEMENTED?!!!");
+#endif
 }
 
 err_t FTPServerConnection::onSent(uint16_t len)
@@ -386,7 +394,9 @@ void FTPServerConnection::response(int code, String text /* = "" */)
 		response += " " + text;
 	response += "\r\n";
 
+#ifdef debug
 	debugf("> %s", response.c_str());
+#endif
 	writeString(response.c_str(), TCP_WRITE_FLAG_COPY); // Dynamic memory, should copy
 	canTransfer = false;
 	flush();

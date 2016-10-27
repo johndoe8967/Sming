@@ -55,7 +55,9 @@ void HttpServer::addPath(String path, HttpPathDelegate callback)
 		path = path.substring(0, path.length() - 1);
 	if (!path.startsWith("/"))
 		path = "/" + path;
+#ifdef debug
 	debugf("'%s' registered", path.c_str());
+#endif
 	paths[path] = callback;
 }
 
@@ -83,12 +85,16 @@ bool HttpServer::processRequest(HttpServerConnection &connection, HttpRequest &r
 
 	if (defaultHandler)
 	{
+#ifdef debug
 		debugf("Default server handler for: '%s'", path.c_str());
+#endif
 		defaultHandler(request, response);
 		return true;
 	}
 
+#ifdef debug
 	debugf("ERROR at server 404: '%s' not found", path.c_str());
+#endif
 	return false;
 }
 
@@ -118,8 +124,10 @@ bool HttpServer::initWebSocket(HttpServerConnection& connection, HttpRequest& re
 
     if (wsCommandEnabled &&  (request.getQueryParameter(wsCommandRequestParam) == "true"))
     {
+#ifdef debug
         debugf("WebSocket Commandprocessor started");
-    	sock->enableCommand();
+#endif
+        sock->enableCommand();
     }
 }
 
@@ -134,7 +142,9 @@ void HttpServer::processWebSocketFrame(pbuf *buf, HttpServerConnection& connecti
 	{
 		String msg;
 		msg.setString((char*)data, size);
+#ifdef debug
 		debugf("WS: %s", msg.c_str());
+#endif
 		if (sock && wsMessage) wsMessage(*sock, msg);
 		if (sock && sock->commandExecutor) sock->commandExecutor->executorReceive(msg+"\r");
 	}
@@ -146,11 +156,13 @@ void HttpServer::processWebSocketFrame(pbuf *buf, HttpServerConnection& connecti
 	{
 		connection.close(); // it will be processed automatically in onCloseWebSocket callback
 	}
+#ifdef debug
 	else if (frameType == WS_INCOMPLETE_FRAME || frameType == WS_ERROR_FRAME)
 		debugf("WS error reading frame: %X", frameType);
 	else
 		debugf("WS frame type: %X", frameType);
-}
+#endif
+	}
 
 void HttpServer::setWebSocketConnectionHandler(WebSocketDelegate handler)
 {
@@ -183,7 +195,9 @@ WebSocket* HttpServer::getWebSocket(HttpServerConnection& connection)
 
 void HttpServer::removeWebSocket(HttpServerConnection& connection)
 {
+#ifdef debug
 	debugf("WS remove connection item");
+#endif
 	for (int i = 0; i < wsocks.count(); i++)
 		if (wsocks[i].is(&connection))
 			wsocks.remove(i--);
@@ -195,7 +209,9 @@ void HttpServer::onCloseWebSocket(HttpServerConnection& connection)
 
 	removeWebSocket(connection);
 
+#ifdef debug
 	debugf("WS Close");
+#endif
 	if (sock && wsDisconnect) wsDisconnect(*sock);
 }
 

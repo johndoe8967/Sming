@@ -8,6 +8,8 @@
 #include "TelnetServer.h"
 #include "TcpServer.h"
 
+//#define debug
+
 TelnetServer::TelnetServer() : TcpServer()
 {
 	// TODO Auto-generated constructor stub
@@ -47,13 +49,17 @@ void TelnetServer::enableCommand(bool reqStatus)
 }
 void TelnetServer::onClient(TcpClient *client)
 {
+#ifdef debug
 	debugf("TelnetServer onClient %s", client->getRemoteIp().toString().c_str() );
+#endif
 
 	TcpServer::onClient(client);
 
 	if (curClient)
 	{
+#ifdef debug
 		debugf("TCP Client already connected");
+#endif
 		client->sendString("Telnet Client already connected\r\n");
 		client->close();
 	}
@@ -70,7 +76,6 @@ void TelnetServer::onClient(TcpClient *client)
 		{
 			Debug.setDebug(DebugPrintCharDelegate(&TelnetServer::wrchar,this));
 		}
-		Debug.printf("This is debug after telnet start\r\n");
 	}
 }
 
@@ -81,14 +86,18 @@ void TelnetServer::onClientComplete(TcpClient& client, bool succesfull)
 		delete commandExecutor;
 		commandExecutor = nullptr;
 		curClient = nullptr;
+#ifdef debug
 		debugf("TelnetServer onClientComplete %s", client.getRemoteIp().toString().c_str() );
 	}
 	else
 	{
 		debugf("Telnet server unconnected client close");
+#endif
 	}
 
+#ifdef debug
 	debugf("TelnetServer onClientComplete %s", client.getRemoteIp().toString().c_str() );
+#endif
 	TcpServer::onClientComplete(client, succesfull);
 	Debug.setDebug(Serial);
 }
@@ -102,8 +111,10 @@ void TelnetServer::wrchar(char c)
 
 bool TelnetServer::onClientReceive (TcpClient& client, char *data, int size)
 {
+#ifdef debug
 	debugf("TelnetServer onClientReceive : %s, %d bytes \r\n",client.getRemoteIp().toString().c_str(),size );
 	debugf("Data : %s", data);
+#endif
 	if (commandExecutor)
 	{
 		commandExecutor->executorReceive(data,size);

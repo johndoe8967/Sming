@@ -7,7 +7,9 @@
 
 DebugClass::DebugClass()
 {
+#ifdef debug
 	debugf("DebugClass Instantiating");
+#endif
 	setDebug(Serial);
 }
 
