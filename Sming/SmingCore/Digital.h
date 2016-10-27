@@ -27,29 +27,29 @@ void pinMode(uint16_t pin, uint8_t mode);
  *  @param  pin GPIO pin to set
  *  @param  val Value to set [0 | 1]
  */
-void IRAM_ATTR digitalWrite(uint16_t pin, uint8_t val);
+void digitalWrite(uint16_t pin, uint8_t val);
 
 /** @brief  Get the value of a digital input
  *  @param  pin GPIO pin to read
  *  @retval uint8_t Value of GPIO
  */
-uint8_t IRAM_ATTR digitalRead(uint16_t pin);
+uint8_t digitalRead(uint16_t pin);
 
 /** @brief  Enable pull-up on digital input
  *  @param  pin GPIO to enable pull-up resistor
  */
-void IRAM_ATTR pullup(uint16_t pin);
+void pullup(uint16_t pin);
 
 /** @brief  Disable pull-up on digital input
  *  @param  pin GPIO to disable pull-up resistor
  */
-void IRAM_ATTR noPullup(uint16_t pin);
+void noPullup(uint16_t pin);
 
 /** @brief  Check if GPIO is an input
  *  @param  pin GPIO to check
  *  @retval bool True if GPIO is an input
  */
-bool IRAM_ATTR isInputPin(uint16_t pin);
+bool isInputPin(uint16_t pin);
 
 /** @brief  Measures duration of pulse on GPIO
  *  @param  pin GPIO to measure
