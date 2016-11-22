@@ -104,18 +104,34 @@ TARGET		= app
 
 # which modules (subdirectories) of the project to include in compiling
 MODULES		= system system/helpers Wiring SmingCore appinit $(filter %/, $(wildcard SmingCore/*/)) $(filter %/, $(wildcard Services/*/)) $(filter %/, $(wildcard Libraries/*/))
-EXTRA_INCDIR    = include system/include Wiring Libraries SmingCore rboot rboot/appcode $(SDK_BASE)/../include
+EXTRA_INCDIR    = include system/include Wiring Libraries SmingCore $(SDK_BASE)/../include
+
+# Place a file that should exist in a submodule that is fetched separately
+THIRD_PARTY_DATA = third-party/rboot/Makefile
+
+# third-party source mapping starts here 
+# => rBoot
+EXTRA_INCDIR += third-party/rboot third-party/rboot/appcode 
+# => esp-gdbstub
+ifeq ($(ENABLE_GDB), 1)
+	THIRD_PARTY_DATA += third-party/esp-gdbstub/Makefile
+	MODULES		 += third-party/esp-gdbstub
+	EXTRA_INCDIR += third-party/esp-gdbstub
+endif
 
 # libraries used in this project, mainly provided by the SDK
 USER_LIBDIR = compiler/lib
 LIBS		= microc microgcc hal phy pp net80211 lwip wpa main
 
+ifeq ($(ENABLE_CUSTOM_PWM), 1)
+	THIRD_PARTY_DATA += third-party/pwm/pwm.c
+	LIBS += pwm
+endif
+
 # compiler flags using during compilation of source files. Add '-pg' for debugging
 CFLAGS		= -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 -DCOM_SPEED_SERIAL=$(COM_SPEED_SERIAL)
 ifeq ($(ENABLE_GDB), 1)
 	CFLAGS += -Og -ggdb -DGDBSTUB_FREERTOS=0 -DENABLE_GDB=1
-	MODULES		 += gdbstub
-	EXTRA_INCDIR += gdbstub
 else
 	CFLAGS += -Os -g
 endif
@@ -207,15 +223,14 @@ $1/%.o: %.cpp
 	$(Q) $(CXX) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CXXFLAGS)  -c $$< -o $$@
 endef
 
-.PHONY: all checkdirs clean spiffy test samples recurse-samples $(SAMPLES_DIRS)
+.PHONY: all checkdirs clean spiffy test samples recurse-samples $(SAMPLES_DIRS) docs api wiki
 
-all: checkdirs $(APP_AR)
+all: checkdirs $(APP_AR) spiffy
 
-ifeq ($(ENABLE_GDB), 1)	
-gdbstub/Makefile: 
-	$(Q) echo "No espgdbstub submodule found. Using git to fetch it..."
-	$(Q) git submodule init
-	$(Q) git submodule update
+ifeq ($(ENABLE_CUSTOM_PWM), 1)	
+$(USER_LIBDIR)/libpwm.a: third-party/pwm/pwm.c
+	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS)  -c $< -o $(BUILD_BASE)/pwm.o
+	$(Q) $(AR) rcs $@ $(BUILD_BASE)/pwm.o
 endif
 
 spiffy: spiffy/spiffy
@@ -232,11 +247,7 @@ $(APP_AR): $(OBJ)
 	$(Q) cp -r $(APP_AR) $(USER_LIBDIR)/libsming.a  
 	$(vecho) "Done"
 
-ifeq ($(ENABLE_GDB), 1)	
-checkdirs: gdbstub/Makefile $(BUILD_DIR) $(FW_BASE)
-else
-checkdirs: $(BUILD_DIR) $(FW_BASE)
-endif
+checkdirs: $(THIRD_PARTY_DATA) $(BUILD_DIR) $(FW_BASE)
 
 $(BUILD_DIR):
 	$(Q) mkdir -p $@
@@ -258,7 +269,36 @@ clean:
 
 test: all spiffy samples
 
-samples: Basic_Blink HttpServer_Bootstrap Basic_rBoot
+docs/wiki/Home.md: 
+	$(Q) echo "No Wiki submodule found. Using git to fetch it..."
+	$(Q) git submodule update --init ../docs/wiki	
+
+docs/api/error.log:
+	$(Q) mkdir -p $(SMING_HOME)/../docs/api
+	$(Q) cd $(SMING_HOME)/../docs; doxygen 2>$(SMING_HOME)/../docs/api/stderr.log 1>$(SMING_HOME)/../docs/api/doxygen.log
+
+docs/api/sming/index.html: docs/api/error.log
+	$(Q) echo "Undocumented compounds: $(shell grep "Compound.*is not documented" $(SMING_HOME)/../docs/api/error.log | wc -l)"
+	$(Q) echo "Undocumented members:  $(shell grep "Member.*is not documented" $(SMING_HOME)/../docs/api/error.log | wc -l) "
+	$(Q) echo "Undocumented parameters: $(shell grep "The following parameters of .* are not documented" $(SMING_HOME)/../docs/api/error.log | wc -l) "
+	$(Q) echo "Open in your browser: file://$(SMING_HOME)/../$@"
+
+wiki: docs/wiki/Home.md 
+api: docs/api/sming/index.html 
+
+docs: wiki api
+
+samples: Basic_Blink HttpServer_Bootstrap Basic_rBoot Basic_HwPWM
+
+third-party/%: 
+	$(Q) echo "Fetching $(dir $@) ..."
+	$(Q) git submodule update --init $(dir $@)
+	$(Q) touch $(patsubst third-party/%/,third-party/.patches/%.patch, $(dir $@))
+	$(Q) patch -p0 < $(patsubst third-party/%/,third-party/.patches/%.patch, $(dir $@))
+# if the new submodule brings source code files that need to be compiled inside Sming
+# then we need somehow to be able to "see" these new files. 
+# For now we solve this by "reloading" the makefile after fetching a module.
+	$(Q) $(MAKE) -C $(SMING_HOME)
 
 recurse-samples: $(SAMPLES_DIRS)
 
