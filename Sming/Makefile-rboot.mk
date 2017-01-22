@@ -139,8 +139,10 @@ TARGET		= app
 THIRD_PARTY_DIR = $(SMING_HOME)/third-party
 
 LIBSMING = sming
+SMING_FEATURES = none
 ifeq ($(ENABLE_SSL),1)
 	LIBSMING = smingssl
+	SMING_FEATURES = SSL
 endif
 
 # which modules (subdirectories) of the project to include in compiling
@@ -148,7 +150,12 @@ endif
 MODULES      ?= app     # default to app if not set by user
 MODULES      += $(THIRD_PARTY_DIR)/rboot/appcode
 EXTRA_INCDIR ?= include # default to include if not set by user
-EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(SMING_HOME)/system/include $(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include $(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
+
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+	LWIP_INCDIR = $(SMING_HOME)/third-party/esp-open-lwip	
+endif
+
+EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME)/system/include $(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include $(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
 
 USER_LIBDIR  = $(SMING_HOME)/compiler/lib/
 
@@ -194,7 +201,12 @@ else
 endif
 # libraries used in this project, mainly provided by the SDK
 
-LIBS		= microc microgcc hal phy pp net80211 lwip wpa $(LIBMAIN) $(LIBSMING) crypto pwm smartconfig $(EXTRA_LIBS)
+LIBLWIP = lwip
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+	LIBLWIP = lwip_open
+endif
+
+LIBS		= microc microgcc hal phy pp net80211 $(LIBLWIP) wpa $(LIBMAIN) $(LIBSMING) crypto pwm smartconfig $(EXTRA_LIBS)
 
 # SSL support using axTLS
 ifeq ($(ENABLE_SSL),1)
@@ -205,10 +217,15 @@ ifeq ($(ENABLE_SSL),1)
 		AXTLS_FLAGS += -DSSL_DEBUG=1 -DDEBUG_TLS_MEM=1
 	endif
 	
-	CUSTOM_TARGETS += $(USER_LIBDIR)/lib$(LIBSMING).a include/ssl/private_key.h
+	CUSTOM_TARGETS += include/ssl/private_key.h
 	CFLAGS += $(AXTLS_FLAGS)  
 	CXXFLAGS += $(AXTLS_FLAGS)	
 endif
+
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+	EXTRA_INCDIR += third-party/esp-open-lwip/include
+endif
+
 
 # we will use global WiFi settings from Eclipse Environment Variables, if possible
 WIFI_SSID ?= ""
@@ -357,7 +374,7 @@ endef
 
 .PHONY: all checkdirs spiff_update spiff_clean clean
 
-all: checkdirs $(LIBMAIN_DST) $(RBOOT_BIN) $(RBOOT_ROM_0) $(RBOOT_ROM_1) $(SPIFF_BIN_OUT) $(FW_FILE_1) $(FW_FILE_2)
+all: $(USER_LIBDIR)/lib$(LIBSMING).a checkdirs $(LIBMAIN_DST) $(RBOOT_BIN) $(RBOOT_ROM_0) $(RBOOT_ROM_1) $(SPIFF_BIN_OUT) $(FW_FILE_1) $(FW_FILE_2) 
 
 $(RBOOT_BIN):
 	$(MAKE) -C $(THIRD_PARTY_DIR)/rboot
@@ -392,7 +409,7 @@ $(APP_AR): $(OBJ)
 	$(Q) $(AR) cru $@ $^
 
 $(USER_LIBDIR)/lib$(LIBSMING).a:
-	$(vecho) "Recompiling Sming with SSL support. This may take some time"
+	$(vecho) "(Re)compiling Sming. Enabled features: $(SMING_FEATURES). This may take some time"
 	$(Q) $(MAKE) -C $(SMING_HOME) clean V=$(V) ENABLE_SSL=$(ENABLE_SSL) SMING_HOME=$(SMING_HOME)
 	$(Q) $(MAKE) -C $(SMING_HOME) V=$(V) ENABLE_SSL=$(ENABLE_SSL) SMING_HOME=$(SMING_HOME)
 
