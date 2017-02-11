@@ -413,7 +413,7 @@ samples-clean:
         
 third-party-clean:
 	$(Q) for dir in $(THIRD_PARTY_DIRS); do \
-          $(Q) rm -rf third-party/$$dir; \
+        	rm -rf third-party/$$dir; \
         done
 	$(Q) $(GIT) checkout third-party     
        
