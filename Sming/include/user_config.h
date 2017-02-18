@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 	// UART config
-	#define SERIAL_BAUD_RATE 115200
+	#define SERIAL_BAUD_RATE COM_SPEED_SERIAL
 
 	// ESP SDK config
 	#define LWIP_OPEN_SRC
@@ -37,6 +37,13 @@ extern "C" {
 
 	// Beta boards
 	#define BOARD_ESP01
+
+	// axTLS stuff
+#ifdef ENABLE_SSL
+	#include <time.h>
+	#include "util/time.h"
+	#include "../axtls-8266/compat/lwipr_compat.h"
+#endif
 
 #ifdef __cplusplus
 }

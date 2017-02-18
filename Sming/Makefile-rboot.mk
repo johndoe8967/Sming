@@ -11,6 +11,20 @@
 # rBoot options, overwrite them in the projects Makefile-user.mk
 RBOOT_BIG_FLASH  ?= 1
 RBOOT_TWO_ROMS   ?= 0
+RBOOT_RTC_ENABLED ?= 0
+RBOOT_GPIO_ENABLED ?= 0
+
+### ROM Addresses ###
+# The parameter below specifies the location of the second rom.
+# This parameter is used only when RBOOT_BIG_FLASH = 1 
+# BOOT_ROM1_ADDR = 0x200000
+
+# The parameter below specifies the location of the GPIO ROM.
+# This parameter is used only when RBOOT_GPIO_ENABLED = 1
+# If you use two SPIFFS make sure that this address is minimum
+# RBOOT_SPIFFS_1 + SPIFF_SIZE 
+# BOOT_ROM2_ADDR = 0x310000
+
 RBOOT_ROM_0      ?= rom0
 RBOOT_ROM_1      ?= rom1
 RBOOT_SPIFFS_0   ?= 0x100000
@@ -21,6 +35,8 @@ RBOOT_LD_1 ?= rom1.ld
 ESPTOOL2 ?= esptool2
 # path to spiffy
 SPIFFY ?= $(SMING_HOME)/spiffy/spiffy
+INIT_BIN_ADDR  = 0x7c000
+BLANK_BIN_ADDR = 0x4b000
 # filenames and options for generating rBoot rom images with esptool2
 RBOOT_E2_SECTS     ?= .text .data .rodata
 RBOOT_E2_USER_ARGS ?= -quiet -bin -boot2
@@ -120,6 +136,10 @@ export COMPILE := gcc
 export PATH := $(ESP_HOME)/xtensa-lx106-elf/bin:$(PATH)
 XTENSA_TOOLS_ROOT := $(ESP_HOME)/xtensa-lx106-elf/bin
 
+STRIP   := $(XTENSA_TOOLS_ROOT)/xtensa-lx106-elf-strip
+
+CURRENT_DIR := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
+
 SPIFF_FILES ?= files
 
 BUILD_BASE	= out/build
@@ -131,30 +151,107 @@ RBOOT_ROM_1  := $(addprefix $(FW_BASE)/,$(RBOOT_ROM_1).bin)
 # name for the target project
 TARGET		= app
 
+THIRD_PARTY_DIR = $(SMING_HOME)/third-party
+
+LIBSMING = sming
+SMING_FEATURES = none
+ifeq ($(ENABLE_SSL),1)
+	LIBSMING = smingssl
+	SMING_FEATURES = SSL
+endif
+
 # which modules (subdirectories) of the project to include in compiling
 # define your custom directories in the project's own Makefile before including this one
 MODULES      ?= app     # default to app if not set by user
-MODULES      += $(SMING_HOME)/rboot/appcode
+MODULES      += $(THIRD_PARTY_DIR)/rboot/appcode
 EXTRA_INCDIR ?= include # default to include if not set by user
-EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(SMING_HOME)/system/include $(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/SmingCore $(SDK_BASE)/../include $(SMING_HOME)/rboot $(SMING_HOME)/rboot/appcode
+
+ENABLE_CUSTOM_LWIP ?= 1
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+	LWIP_INCDIR = $(SMING_HOME)/third-party/esp-open-lwip/include	
+endif
+
+EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME)/system/include $(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include $(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
+
+USER_LIBDIR  = $(SMING_HOME)/compiler/lib/
 
 # compiler flags using during compilation of source files
-CFLAGS		= -Os -g -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 $(USER_CFLAGS)
+CFLAGS		= -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 -DCOM_SPEED_SERIAL=$(COM_SPEED_SERIAL) $(USER_CFLAGS)
+ifeq ($(SMING_RELEASE),1)
+	# See: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
+	#      for full list of optimization options
+	CFLAGS += -Os -DSMING_RELEASE=1
+else ifeq ($(ENABLE_GDB), 1)
+	CFLAGS += -Og -ggdb -DGDBSTUB_FREERTOS=0 -DENABLE_GDB=1
+	MODULES		 += $(THIRD_PARTY_DIR)/gdbstub
+	EXTRA_INCDIR += $(THIRD_PARTY_DIR)/gdbstub
+	STRIP := @true
+else
+	CFLAGS += -Os -g
+	STRIP := @true
+endif
 CXXFLAGS	= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11 -felide-constructors
+
+ENABLE_CUSTOM_HEAP ?= 0
+ 
+LIBMAIN = main
+ifeq ($(ENABLE_CUSTOM_HEAP),1)
+	LIBMAIN = mainmm
+endif
+
+LIBMAIN = main
+LIBMAIN_SRC = $(addprefix $(SDK_LIBDIR)/,libmain.a)
+
+ifeq ($(ENABLE_CUSTOM_HEAP),1)
+	LIBMAIN = mainmm
+	LIBMAIN_SRC := $(USER_LIBDIR)lib$(LIBMAIN).a
+endif
 
 # libmain must be modified for rBoot big flash support (just one symbol gets weakened)
 ifeq ($(RBOOT_BIG_FLASH),1)
 	LIBMAIN = main2
-	LIBMAIN_SRC = $(addprefix $(SDK_LIBDIR)/,libmain.a)
 	LIBMAIN_DST = $(addprefix $(BUILD_BASE)/,libmain2.a)
 	CFLAGS += -DBOOT_BIG_FLASH
 else
-	LIBMAIN = main
 	LIBMAIN_DST = $()
 endif
 # libraries used in this project, mainly provided by the SDK
-USER_LIBDIR = $(SMING_HOME)/compiler/lib/
-LIBS		= microc microgcc hal phy pp net80211 lwip wpa $(LIBMAIN) sming crypto pwm smartconfig $(EXTRA_LIBS)
+
+LIBLWIP = lwip
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+	LIBLWIP = lwip_open
+	ifeq ($(ENABLE_ESPCONN), 1)
+		LIBLWIP = lwip_full
+	endif
+	CUSTOM_TARGETS += $(USER_LIBDIR)/lib$(LIBLWIP).a
+endif
+
+LIBPWM = pwm
+ifeq ($(ENABLE_CUSTOM_PWM), 1)
+	LIBPWM = pwm_open
+	CUSTOM_TARGETS += $(USER_LIBDIR)/lib$(LIBPWM).a
+endif
+
+LIBS		= microc microgcc hal phy pp net80211 $(LIBLWIP) wpa $(LIBMAIN) $(LIBSMING) crypto $(LIBPWM) smartconfig $(EXTRA_LIBS)
+
+# SSL support using axTLS
+ifeq ($(ENABLE_SSL),1)
+	LIBS += axtls	
+	EXTRA_INCDIR += $(THIRD_PARTY_DIR)/axtls-8266 $(THIRD_PARTY_DIR)/axtls-8266/ssl $(THIRD_PARTY_DIR)/axtls-8266/crypto 
+	AXTLS_FLAGS = -DLWIP_RAW=1 -DENABLE_SSL=1
+	ifeq ($(SSL_DEBUG),1) # 
+		AXTLS_FLAGS += -DSSL_DEBUG=1 -DDEBUG_TLS_MEM=1
+	endif
+	
+	CUSTOM_TARGETS += include/ssl/private_key.h
+	CFLAGS += $(AXTLS_FLAGS)  
+	CXXFLAGS += $(AXTLS_FLAGS)	
+endif
+
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+	EXTRA_INCDIR += third-party/esp-open-lwip/include
+endif
+
 
 # we will use global WiFi settings from Eclipse Environment Variables, if possible
 WIFI_SSID ?= ""
@@ -170,7 +267,7 @@ ifeq ($(DISABLE_SPIFFS), 1)
 endif
 
 # linker flags used to generate the main object file
-LDFLAGS		= -nostdlib -u call_user_start -u Cache_Read_Enable_New -Wl,-static -Wl,--gc-sections -Wl,-Map=$(basename $@).map
+LDFLAGS		= -nostdlib -u call_user_start -u Cache_Read_Enable_New -Wl,-static -Wl,--gc-sections -Wl,-Map=$(basename $@).map -Wl,-wrap,system_restart_local 
 
 ifeq ($(SPI_SPEED), 26)
 	flashimageoptions = -ff 26m
@@ -198,12 +295,18 @@ ifeq ($(SPI_SIZE), 256K)
 else ifeq ($(SPI_SIZE), 1M)
 	flashimageoptions += -fs 8m
 	SPIFF_SIZE ?= 524288  #512K
+	INIT_BIN_ADDR  = 0x0fc000
+	BLANK_BIN_ADDR = 0x0fe000
 else ifeq ($(SPI_SIZE), 2M)
 	flashimageoptions += -fs 16m
 	SPIFF_SIZE ?= 524288  #512K
+	INIT_BIN_ADDR  = 0x1fc000
+	BLANK_BIN_ADDR = 0x1fe000
 else ifeq ($(SPI_SIZE), 4M)
 	flashimageoptions += -fs 32m
 	SPIFF_SIZE ?= 524288  #512K
+	INIT_BIN_ADDR  = 0x3fc000
+	BLANK_BIN_ADDR = 0x3fe000
 else
 	flashimageoptions += -fs 4m
 	SPIFF_SIZE ?= 196608  #192K
@@ -256,6 +359,10 @@ RBOOT_FW_BASE := $(abspath $(FW_BASE))
 export RBOOT_BIG_FLASH
 export RBOOT_BUILD_BASE
 export RBOOT_FW_BASE
+export RBOOT_RTC_ENABLED
+export RBOOT_GPIO_ENABLED
+export RBOOT_ROM1_ADDR
+export RBOOT_ROM2_ADDR
 export SPI_SIZE
 export SPI_MODE
 export SPI_SPEED
@@ -268,6 +375,15 @@ ifeq ($(RBOOT_TWO_ROMS),1)
 else
 	# eliminate the second rBoot target
 	RBOOT_ROM_1 := $()
+endif
+
+ifeq ($(RBOOT_RTC_ENABLED),1)
+	# enable the temporary switch to rom feature
+	CFLAGS += -DBOOT_RTC_ENABLED
+endif
+
+ifeq ($(RBOOT_GPIO_ENABLED),1)
+	CFLAGS += -DBOOT_GPIO_ENABLED
 endif
 
 INCDIR	:= $(addprefix -I,$(SRC_DIR))
@@ -297,10 +413,10 @@ endef
 
 .PHONY: all checkdirs spiff_update spiff_clean clean
 
-all: checkdirs $(LIBMAIN_DST) $(RBOOT_BIN) $(RBOOT_ROM_0) $(RBOOT_ROM_1) $(SPIFF_BIN_OUT) $(FW_FILE_1) $(FW_FILE_2)
+all: $(USER_LIBDIR)/lib$(LIBSMING).a checkdirs $(LIBMAIN_DST) $(RBOOT_BIN) $(RBOOT_ROM_0) $(RBOOT_ROM_1) $(SPIFF_BIN_OUT) $(FW_FILE_1) $(FW_FILE_2) 
 
 $(RBOOT_BIN):
-	$(MAKE) -C $(SMING_HOME)/rboot
+	$(MAKE) -C $(THIRD_PARTY_DIR)/rboot RBOOT_GPIO_ENABLED=$(RBOOT_GPIO_ENABLED)
 
 $(LIBMAIN_DST): $(LIBMAIN_SRC)
 	@echo "OC $@"
@@ -319,16 +435,39 @@ $(RBOOT_ROM_1): $(TARGET_OUT_1)
 $(TARGET_OUT_0): $(APP_AR)
 	$(vecho) "LD $@"
 	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(BUILD_BASE) $(RBOOT_LD_0) $(LDFLAGS) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
+	$(Q) $(STRIP) $@
+
 
 $(TARGET_OUT_1): $(APP_AR)
 	$(vecho) "LD $@"
 	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(BUILD_BASE) $(RBOOT_LD_1) $(LDFLAGS) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
+	$(Q) $(STRIP) $@
 
 $(APP_AR): $(OBJ)
 	$(vecho) "AR $@"
 	$(Q) $(AR) cru $@ $^
 
-checkdirs: $(BUILD_DIR) $(FW_BASE)
+$(USER_LIBDIR)/lib$(LIBSMING).a:
+	$(vecho) "(Re)compiling Sming. Enabled features: $(SMING_FEATURES). This may take some time"
+	$(Q) $(MAKE) -C $(SMING_HOME) clean V=$(V) ENABLE_SSL=$(ENABLE_SSL) SMING_HOME=$(SMING_HOME)
+	$(Q) $(MAKE) -C $(SMING_HOME) V=$(V) ENABLE_SSL=$(ENABLE_SSL) SMING_HOME=$(SMING_HOME)
+
+include/ssl/private_key.h:
+	$(vecho) "Generating unique certificate and key. This may take some time"
+	$(Q) mkdir -p $(CURRENT_DIR)/include/ssl/
+	$(Q) AXDIR=$(CURRENT_DIR)/include/ssl/  $(THIRD_PARTY_DIR)/axtls-8266/tools/make_certs.sh 
+	
+ifeq ($(ENABLE_CUSTOM_PWM), 1)
+$(USER_LIBDIR)/libpwm_open.a:
+	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/libpwm_open.a ENABLE_CUSTOM_PWM=1
+endif
+
+ifeq ($(ENABLE_CUSTOM_LWIP), 1)
+$(USER_LIBDIR)/liblwip_%.a:
+	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/$(notdir $@) ENABLE_CUSTOM_LWIP=1 ENABLE_ESPCONN=$(ENABLE_ESPCONN)
+endif
+
+checkdirs: $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
 
 $(BUILD_DIR):
 	$(Q) mkdir -p $@
@@ -368,9 +507,15 @@ else
 endif
 	$(TERMINAL)
 
+terminal:
+	$(vecho) "Killing Terminal to free $(COM_PORT)"
+	-$(Q) $(KILL_TERM)
+	$(TERMINAL)
+
 flashinit:
 	$(vecho) "Flash init data default and blank data."
-	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) 0x7c000 $(SDK_BASE)/bin/esp_init_data_default.bin 0x7e000 $(SDK_BASE)/bin/blank.bin 0x4B000 $(SMING_HOME)/compiler/data/blankfs.bin
+	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) erase_flash
+	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) $(INIT_BIN_ADDR) $(SDK_BASE)/bin/esp_init_data_default.bin $(BLANK_BIN_ADDR) $(SDK_BASE)/bin/blank.bin $(SPIFF_START_OFFSET) $(SMING_HOME)/compiler/data/blankfs.bin
 
 rebuild: clean all
 
