@@ -99,6 +99,25 @@ export COMPILE := gcc
 export PATH := $(ESP_HOME)/xtensa-lx106-elf/bin:$(PATH)
 XTENSA_TOOLS_ROOT := $(ESP_HOME)/xtensa-lx106-elf/bin
 
+## COM port parameters
+# Default COM port speed (generic)
+COM_SPEED ?= 115200
+
+# Default COM port speed (used for flashing)
+COM_SPEED_ESPTOOL ?= $(COM_SPEED)
+
+# Default COM port speed (used in code)
+COM_SPEED_SERIAL  ?= $(COM_SPEED)
+
+### Debug output parameters
+# By default `debugf` does not print file name and line number. If you want this enabled set the directive below to 1
+DEBUG_PRINT_FILENAME_AND_LINE ?= 0
+
+# Defaut debug verbose level is INFO, where DEBUG=3 INFO=2 WARNING=1 ERROR=0 
+DEBUG_VERBOSE_LEVEL ?= 2
+
+RELOAD_MKFILE = 0
+
 # Sming Framework Path
 SMF = $(SMING_HOME)
 
@@ -106,6 +125,7 @@ SPIFF_FILES = files
 
 BUILD_BASE	= out/build
 FW_BASE		= out/firmware
+USER_LIBDIR = compiler/lib
 
 LIBSMING = libsming
 ifeq ($(ENABLE_SSL),1)
@@ -152,20 +172,23 @@ endif
 
 # => Open Source LWIP
 LIBLWIP = lwip
-ENABLE_ESPCONN ?= 1
+ENABLE_CUSTOM_LWIP ?= 1
+ENABLE_ESPCONN ?= 0
 ifeq ($(ENABLE_CUSTOM_LWIP), 1)
 	THIRD_PARTY_DATA += third-party/esp-open-lwip/Makefile.open
 	EXTRA_INCDIR += third-party/esp-open-lwip/include
-	CUSTOM_TARGETS += $(USER_LIBDIR)/liblwip_open.a
-	LIBLWIP = lwip_open
+	ifeq ($(ENABLE_ESPCONN), 1)
+		LIBLWIP = lwip_full
+	else
+		LIBLWIP = lwip_open
+	endif
+	CUSTOM_TARGETS += $(USER_LIBDIR)/lib$(LIBLWIP).a
 endif
 
 # libraries used in this project, mainly provided by the SDK
-USER_LIBDIR = compiler/lib
 LIBS		= microc microgcc hal phy pp net80211 $(LIBLWIP) wpa main
 ifeq ($(ENABLE_CUSTOM_PWM), 1)
 	THIRD_PARTY_DATA += third-party/pwm/pwm.c
-	LIBS += pwm
 endif
 
 # compiler flags using during compilation of source files. Add '-pg' for debugging
@@ -179,6 +202,10 @@ else ifeq ($(ENABLE_GDB), 1)
 else
 	CFLAGS += -Os -g
 endif
+
+#Append debug options
+CFLAGS += -DCUST_FILE_BASE=$$(subst /,_,$(subst .,_,$$*)) -DDEBUG_VERBOSE_LEVEL=$(DEBUG_VERBOSE_LEVEL) -DDEBUG_PRINT_FILENAME_AND_LINE=$(DEBUG_PRINT_FILENAME_AND_LINE)
+
 CXXFLAGS	= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11 -felide-constructors
 
 # linker flags used to generate the main object file
@@ -248,6 +275,7 @@ EXTRA_INCDIR	:= $(addprefix -I,$(EXTRA_INCDIR))
 MODULE_INCDIR	:= $(addsuffix /include,$(INCDIR))
 
 SAMPLES_DIRS := $(shell ls -1 ../samples)
+THIRD_PARTY_DIRS := $(shell ls -1 third-party )
 DOXYGEN := $(shell command -v doxygen 2> /dev/null)
 
 V ?= $(VERBOSE)
@@ -288,7 +316,7 @@ endef
 all: checkdirs $(APP_AR) spiffy
 
 ifeq ($(ENABLE_CUSTOM_PWM), 1)	
-$(USER_LIBDIR)/libpwm.a: third-party/pwm/pwm.c
+$(USER_LIBDIR)/libpwm_open.a: third-party/pwm/pwm.c
 	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS)  -c $< -o $(dir $<)/pwm.o
 	$(Q) $(AR) rcs $@ $(dir $<)/pwm.o
 endif 
@@ -306,14 +334,13 @@ $(USER_LIBDIR)/libmainmm.a: $(addprefix $(SDK_LIBDIR)/,libmain.a)
 endif
 
 ifeq ($(ENABLE_CUSTOM_LWIP), 1)
-$(USER_LIBDIR)/liblwip_open.a: third-party/esp-open-lwip/Makefile.open
-	$(Q) $(MAKE) -C third-party/esp-open-lwip/ -f Makefile.open ENABLE_ESPCONN=$(ENABLE_ESPCONN) USER_LIBDIR=$(SMING_HOME)/$(USER_LIBDIR)/
+$(USER_LIBDIR)/liblwip_%.a: third-party/esp-open-lwip/Makefile.open
+	$(Q) $(MAKE) -C third-party/esp-open-lwip/ -f Makefile.open ENABLE_ESPCONN=$(ENABLE_ESPCONN) SDK_BASE="$(SDK_BASE)" USER_LIBDIR="$(SMING_HOME)/$(USER_LIBDIR)/" all
 endif
-
 
 spiffy: spiffy/spiffy
 
-spiffy/spiffy:
+spiffy/spiffy: third-party/spiffs/makefile
 	$(vecho) "Making spiffy utility"
 	$(Q) $(MAKE) --no-print-directory -C spiffy V=$(V)
 	$(vecho) "Done"
@@ -330,7 +357,7 @@ endif
 	$(Q) cp -r $(APP_AR) $(USER_LIBDIR)/$(LIBSMING).a  
 	$(vecho) "Done"
 
-checkdirs: $(THIRD_PARTY_DATA) $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
+checkdirs: $(THIRD_PARTY_DATA) reload $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
 
 $(BUILD_DIR):
 	$(Q) mkdir -p $@
@@ -381,11 +408,16 @@ third-party/%:
 	$(vecho) "Fetching $(dir $@) ..."
 	$(Q) $(GIT) submodule update --init --recursive $(dir $@)
 	$(Q) touch $(patsubst third-party/%/,third-party/.patches/%.patch, $(dir $@))
-	$(Q) -cd $(dir $@); $(GIT) apply -v $(patsubst third-party/%/,$(SMING_HOME)/third-party/.patches/%.patch, $(dir $@))
+	$(Q) -cd $(dir $@); $(GIT) apply -v $(patsubst third-party/%/,$(SMING_HOME)/third-party/.patches/%.patch, $(dir $@)) --ignore-whitespace --whitespace=nowarn
 # if the new submodule brings source code files that need to be compiled inside Sming
 # then we need somehow to be able to "see" these new files. 
 # For now we solve this by "reloading" the makefile after fetching a module.
-	$(Q) $(MAKE) -C $(SMING_HOME)
+    RELOAD_MKFILE=1
+
+reload: 
+	$(Q) if [ $(RELOAD_MKFILE) -eq 1 ]; then \
+        $(MAKE) -C $(SMING_HOME) $(MAKECMDGOALS) RELOAD_MKFILE=0; \
+    fi
 
 samples: $(SAMPLES_DIRS)
 
@@ -396,6 +428,18 @@ samples-clean:
 	$(Q) for dir in $(SAMPLES_DIRS); do \
           $(MAKE) -C $(SMING_HOME)/../samples/$$dir clean; \
         done
+        
+third-party-clean:
+	$(Q) for dir in $(THIRD_PARTY_DIRS); do \
+          rm -rf third-party/$$dir; \
+        done
+	$(Q) $(GIT) checkout third-party     
+       
+dist-clean: clean samples-clean third-party-clean
+	$(Q) for file in $(shell ls $(USER_LIBDIR)/lib*.a ); do \
+ 	   rm $$file; \
+ 	done
+	$(Q) $(GIT) checkout $(USER_LIBDIR)
 
 $(foreach bdir,$(BUILD_DIR),$(eval $(call compile-objects,$(bdir))))
 
