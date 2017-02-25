@@ -34,16 +34,16 @@ Sming - Open Source framework for high efficiency WiFi SoC ESP8266 native develo
 
 OS/SDK | Linux | Mac OS X | Windows | FreeBSD-current |
 -------|-------|----------|---------|-----------------|
-UDK (1.4, 1.5)    | n/a   | n/a      |   :sunny:      |     n/a         |
-esp-alt-sdk (1.4, 1.5) | :sunny:  | :sunny:  | :sunny:  | :sunny:  | :sunny:  |
-esp-open-sdk (1.4, 1.5, 2.0) | :sunny:  | :sunny: | n/a | n/a |
+UDK (v1.5)    | n/a   | n/a      |   [![Build status](https://ci.appveyor.com/api/projects/status/5aj0oi0wyk4uij00/branch/develop?svg=true)](https://ci.appveyor.com/project/slaff/sming-sb483/branch/develop)      |     n/a         |
+esp-alt-sdk (v1.4, v1.5) | :sunny:  | :sunny:  | :sunny:  | :sunny:  | :sunny:  |
+esp-open-sdk (v1.4, v1.5, v2.0) | :sunny:  | :sunny: | n/a | n/a |
 
 OS = Operating System
 SDK = Software Development Kit
 n/a = The selected SDK is not available on that OS
 
-## Latest Release
-- [Sming V3.0.1](https://github.com/SmingHub/Sming/releases/tag/3.0.1)
+## Latest Stable Release
+- [Sming V3.1.0](https://github.com/SmingHub/Sming/releases/tag/3.1.0)
 
 ## Getting started
 - [Windows](https://github.com/SmingHub/Sming/wiki/Windows-Quickstart)
@@ -62,6 +62,7 @@ n/a = The selected SDK is not available on that OS
 - Custom PWM:(default:off) If you want to use the [open PWM implementation](https://github.com/StefanBruens/ESP8266_new_pwm) then compile your application with ENABLE_CUSTOM_PWM=1. There is no need to recompile the Sming library.
 - Custom serial baud rate: (default:off) The default serial baud rate is 115200. If you want to change it to a higher baud rate you can recompile Sming and your application changing the COM_SPEED_SERIAL directive. For example COM_SPEED_SERIAL=921600
 - Custom Heap Allocation:(default:off) If your application is experiencing heap fragmentation then you can try the Umm Malloc heap allocation. To enable it compile Sming with ENABLE_CUSTOM_HEAP=1. In order to use it in your sample/application make sure to compile the sample with ENABLE_CUSTOM_HEAP=1. Avoid enabling your custom heap allocation AND -mforce-l32 compiler flag.
+- Debug information log level and format: There are four debug levels: debug=3, info=2, warn=1, error=0. Using DEBUG_VERBOSE_LEVEL you can set the desired level (0-3). For example  DEBUG_VERBOSE_LEVEL=2 will show only info messages and above. Another make directive is DEBUG_PRINT_FILENAME_AND_LINE=1 which enables printing the filename and line number of every degub line. This will require extra space on flash. Note: You can compile the Sming library with a set of debug directives and your project with another settings, this way you can control debugging sepparately for sming and your application code.
 
 You can find more information about compilation and flashing process by reading esp8266.com forum discussion thread.
 

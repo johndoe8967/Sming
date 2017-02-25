@@ -109,6 +109,15 @@ COM_SPEED_ESPTOOL ?= $(COM_SPEED)
 # Default COM port speed (used in code)
 COM_SPEED_SERIAL  ?= $(COM_SPEED)
 
+### Debug output parameters
+# By default `debugf` does not print file name and line number. If you want this enabled set the directive below to 1
+DEBUG_PRINT_FILENAME_AND_LINE ?= 0
+
+# Defaut debug verbose level is INFO, where DEBUG=3 INFO=2 WARNING=1 ERROR=0 
+DEBUG_VERBOSE_LEVEL ?= 2
+
+RELOAD_MKFILE = 0
+
 # Sming Framework Path
 SMF = $(SMING_HOME)
 
@@ -193,6 +202,10 @@ else ifeq ($(ENABLE_GDB), 1)
 else
 	CFLAGS += -Os -g
 endif
+
+#Append debug options
+CFLAGS += -DCUST_FILE_BASE=$$(subst /,_,$(subst .,_,$$*)) -DDEBUG_VERBOSE_LEVEL=$(DEBUG_VERBOSE_LEVEL) -DDEBUG_PRINT_FILENAME_AND_LINE=$(DEBUG_PRINT_FILENAME_AND_LINE)
+
 CXXFLAGS	= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11 -felide-constructors
 
 # linker flags used to generate the main object file
@@ -327,7 +340,7 @@ endif
 
 spiffy: spiffy/spiffy
 
-spiffy/spiffy:
+spiffy/spiffy: third-party/spiffs/makefile
 	$(vecho) "Making spiffy utility"
 	$(Q) $(MAKE) --no-print-directory -C spiffy V=$(V)
 	$(vecho) "Done"
@@ -344,7 +357,7 @@ endif
 	$(Q) cp -r $(APP_AR) $(USER_LIBDIR)/$(LIBSMING).a  
 	$(vecho) "Done"
 
-checkdirs: $(THIRD_PARTY_DATA) $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
+checkdirs: $(THIRD_PARTY_DATA) reload $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
 
 $(BUILD_DIR):
 	$(Q) mkdir -p $@
@@ -399,7 +412,12 @@ third-party/%:
 # if the new submodule brings source code files that need to be compiled inside Sming
 # then we need somehow to be able to "see" these new files. 
 # For now we solve this by "reloading" the makefile after fetching a module.
-	$(Q) $(MAKE) -C $(SMING_HOME)
+    RELOAD_MKFILE=1
+
+reload: 
+	$(Q) if [ $(RELOAD_MKFILE) -eq 1 ]; then \
+        $(MAKE) -C $(SMING_HOME) $(MAKECMDGOALS) RELOAD_MKFILE=0; \
+    fi
 
 samples: $(SAMPLES_DIRS)
 
@@ -413,14 +431,14 @@ samples-clean:
         
 third-party-clean:
 	$(Q) for dir in $(THIRD_PARTY_DIRS); do \
-        	rm -rf third-party/$$dir; \
+          rm -rf third-party/$$dir; \
         done
 	$(Q) $(GIT) checkout third-party     
        
 dist-clean: clean samples-clean third-party-clean
 	$(Q) for file in $(shell ls $(USER_LIBDIR)/lib*.a ); do \
- 			rm $$file; \
- 		done
+ 	   rm $$file; \
+ 	done
 	$(Q) $(GIT) checkout $(USER_LIBDIR)
 
 $(foreach bdir,$(BUILD_DIR),$(eval $(call compile-objects,$(bdir))))
