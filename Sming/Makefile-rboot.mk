@@ -29,7 +29,7 @@ RBOOT_ROM_0      ?= rom0
 RBOOT_ROM_1      ?= rom1
 RBOOT_SPIFFS_0   ?= 0x100000
 RBOOT_SPIFFS_1   ?= 0x300000
-RBOOT_LD_0 ?= $(SMING_HOME)/compiler/ld/rboot.rom0.ld
+RBOOT_LD_0 ?= rboot.rom0.ld
 RBOOT_LD_1 ?= rom1.ld
 # esptool2 path
 ESPTOOL2 ?= esptool2
@@ -65,6 +65,9 @@ DEBUG_PRINT_FILENAME_AND_LINE ?= 0
 
 # Defaut debug verbose level is INFO, where DEBUG=3 INFO=2 WARNING=1 ERROR=0 
 DEBUG_VERBOSE_LEVEL ?= 2
+
+# Disable CommandExecutor functionality if not used and save some ROM and RAM
+ENABLE_CMD_EXECUTOR ?= 1
 
 ## ESP_HOME sets the path where ESP tools and SDK are located.
 ## Windows:
@@ -188,7 +191,7 @@ EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME
 USER_LIBDIR  = $(SMING_HOME)/compiler/lib/
 
 # compiler flags using during compilation of source files
-CFLAGS		= -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 -DCOM_SPEED_SERIAL=$(COM_SPEED_SERIAL) $(USER_CFLAGS)
+CFLAGS		= -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 -DCOM_SPEED_SERIAL=$(COM_SPEED_SERIAL) $(USER_CFLAGS) -DENABLE_CMD_EXECUTOR=$(ENABLE_CMD_EXECUTOR)
 ifeq ($(SMING_RELEASE),1)
 	# See: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
 	#      for full list of optimization options
@@ -203,7 +206,7 @@ else
 	STRIP := @true
 endif
 #Append debug options
-CFLAGS  += -DCUST_FILE_BASE=$$(subst /,_,$(subst .,_,$$*)) -DDEBUG_VERBOSE_LEVEL=$(DEBUG_VERBOSE_LEVEL) -DDEBUG_PRINT_FILENAME_AND_LINE=$(DEBUG_PRINT_FILENAME_AND_LINE)
+CFLAGS  += -DCUST_FILE_BASE=$$* -DDEBUG_VERBOSE_LEVEL=$(DEBUG_VERBOSE_LEVEL) -DDEBUG_PRINT_FILENAME_AND_LINE=$(DEBUG_PRINT_FILENAME_AND_LINE)
 CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11 -felide-constructors
 
 ENABLE_CUSTOM_HEAP ?= 0
@@ -448,7 +451,7 @@ $(RBOOT_ROM_1): $(TARGET_OUT_1)
 
 $(TARGET_OUT_0): $(APP_AR)
 	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(BUILD_BASE) $(RBOOT_LD_0) $(LDFLAGS) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
+	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(BUILD_BASE) -L$(SMING_HOME)/compiler/ld $(RBOOT_LD_0) $(LDFLAGS) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
 	$(Q) $(STRIP) $@
 	
 	$(Q) $(MEMANALYZER) $@ > $(FW_MEMINFO_NEW)
@@ -462,7 +465,7 @@ $(TARGET_OUT_0): $(APP_AR)
 
 $(TARGET_OUT_1): $(APP_AR)
 	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(BUILD_BASE) $(RBOOT_LD_1) $(LDFLAGS) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
+	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(BUILD_BASE) -L$(SMING_HOME)/compiler/ld  $(RBOOT_LD_1) $(LDFLAGS) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
 	$(Q) $(STRIP) $@
 
 $(APP_AR): $(OBJ)
