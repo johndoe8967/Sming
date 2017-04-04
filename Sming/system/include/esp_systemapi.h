@@ -19,6 +19,8 @@
 #include <user_config.h>
 
 #include "m_printf.h"
+#include "debug_progmem.h"
+#include "stringutil.h"
 
 #define __ESP8266_EX__ // System definition ESP8266 SOC
 
@@ -27,8 +29,18 @@
 #define STORE_TYPEDEF_ATTR __attribute__((aligned(4),packed))
 #define STORE_ATTR __attribute__((aligned(4)))
 
+#ifdef ENABLE_GDB
+	#define GDB_IRAM_ATTR IRAM_ATTR
+#else
+	#define GDB_IRAM_ATTR
+#endif
+
 #undef assert
-#define debugf(fmt, ...) m_printf(fmt"\r\n", ##__VA_ARGS__)
+#ifdef SMING_RELEASE
+#define debugf(fmt, ...)
+#else
+#define debugf debug_i
+#endif
 #define assert(condition) if (!(condition)) SYSTEM_ERROR("ASSERT: %s %d", __FUNCTION__, __LINE__)
 #define SYSTEM_ERROR(fmt, ...) m_printf("ERROR: " fmt "\r\n", ##__VA_ARGS__)
 
@@ -83,6 +95,9 @@ extern void ets_intr_unlock();
 // CPU Frequency
 extern void ets_update_cpu_frequency(uint32_t frq);
 extern uint32_t ets_get_cpu_frequency();
+
+extern void xt_disable_interrupts();
+extern void xt_enable_interrupts();
 
 typedef signed short file_t;
 

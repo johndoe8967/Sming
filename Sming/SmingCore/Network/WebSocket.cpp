@@ -17,10 +17,12 @@ WebSocket::WebSocket(HttpServerConnection* conn)
 
 WebSocket::~WebSocket()
 {
+#if ENABLE_CMD_EXECUTOR
 	if (commandExecutor)
 	{
 		delete commandExecutor;
 	}
+#endif
 }
 
 bool WebSocket::initialize(HttpRequest& request, HttpResponse& response)
@@ -50,8 +52,7 @@ void WebSocket::send(const char* message, int length, wsFrameType type)
 	size_t headSize = sizeof(frameHeader);
 	wsMakeFrame(nullptr, length, frameHeader, &headSize, type);
 	connection->write((char*)frameHeader, headSize, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
-	connection->writeString(message, TCP_WRITE_FLAG_COPY);
-	connection->flush();
+	connection->write(message, length, TCP_WRITE_FLAG_COPY);
 }
 
 void WebSocket::sendString(const String& message)
@@ -66,8 +67,25 @@ void WebSocket::sendBinary(const uint8_t* data, int size)
 
 void WebSocket::enableCommand()
 {
+#if ENABLE_CMD_EXECUTOR
 	if (!commandExecutor)
 	{
 		commandExecutor = new CommandExecutor(this);
 	}
+#endif
+}
+
+void WebSocket::close()
+{
+	connection->close();
+}
+
+void WebSocket::setUserData(void* userData)
+{
+	this->userData = userData;
+}
+
+void* WebSocket::getUserData()
+{
+	return userData;
 }

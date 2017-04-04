@@ -8,7 +8,7 @@
 #ifndef _NET_WIRING_
 #define _NET_WIRING_
 
-#define SMING_VERSION "2.1.0" // Major Minor Sub
+#define SMING_VERSION "3.1.2" // Major Minor Sub
 
 #include "../Wiring/WiringFrameworkIncludes.h"
 
@@ -26,12 +26,16 @@
 #include "Timer.h"
 #include "Wire.h"
 #include "SPISoft.h"
+#include "SPI.h"
+
 
 #include "Platform/System.h"
+#include "Platform/WifiEvents.h"
 #include "Platform/Station.h"
 #include "Platform/AccessPoint.h"
 #include "Platform/WDT.h"
 
+#include "Network/DNSServer.h"
 #include "Network/HttpClient.h"
 #include "Network/MqttClient.h"
 #include "Network/NtpClient.h"
@@ -51,5 +55,6 @@
 #include "../Services/DateTime/DateTime.h"
 #include "../Services/libemqtt/libemqtt.h"
 #include "../Services/FATFS/ff.h"
+#include "../Services/Yeelight/YeelightBulb.h"
 
 #endif

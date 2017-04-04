@@ -41,6 +41,7 @@ TcpConnection* HttpServer::createClient(tcp_pcb *clientTcp)
 
 void HttpServer::enableHeaderProcessing(String headerName)
 {
+	headerName.toLowerCase();
 	for (int i = 0; i < processingHeaders.count(); i++)
 		if (processingHeaders[i].equals(headerName))
 			return;
@@ -109,15 +110,19 @@ bool HttpServer::initWebSocket(HttpServerConnection& connection, HttpRequest& re
     if (!sock->initialize(request, response))
         return false;
 
+    connection.setTimeOut(USHRT_MAX); //Disable disconnection on connection idle (no rx/tx)
 	connection.setDisconnectionHandler(HttpServerConnectionDelegate(&HttpServer::onCloseWebSocket, this)); // auto remove on close
 	response.sendHeader(connection); // Will push header before user data
 
     wsocks.addElement(sock);
     if (wsConnect) wsConnect(*sock);
-
     if (wsCommandEnabled &&  (request.getQueryParameter(wsCommandRequestParam) == "true"))
     {
+#if ENABLE_CMD_EXECUTOR
         debugf("WebSocket Commandprocessor started");
+#else
+        debugf("WebSocket Commandprocessor support DISABLED via ENABLE_CMD_EXECUTOR");
+#endif
     	sock->enableCommand();
     }
 }
@@ -126,7 +131,18 @@ void HttpServer::processWebSocketFrame(pbuf *buf, HttpServerConnection& connecti
 {
 	//TODO: process splitted payload
 	uint8_t* data; size_t size;
-	wsFrameType frameType = wsParseInputFrame((uint8_t*)buf->payload, buf->len, &data, &size);
+
+	wsFrameType frameType = (wsFrameType) 0x01;
+	uint8_t payloadFieldExtraBytes = 0;
+	size_t payloadLength = 0;
+	size_t payloadShift = 0;
+	do
+	{
+	payloadLength = getPayloadLength((uint8_t*)buf->payload + payloadShift, buf->len, &payloadFieldExtraBytes, &frameType);
+
+//    debugf("payloadLength: %u, payLoadShift: %u, payloadFieldExtraBytes: %u\n", payloadLength, payloadShift, payloadFieldExtraBytes);
+
+	wsFrameType frameType = wsParseInputFrame((uint8_t*)buf->payload + payloadShift, (payloadLength + 6 + payloadFieldExtraBytes), &data, &size);
 	WebSocket* sock = getWebSocket(connection);
 
 	if (frameType == WS_TEXT_FRAME)
@@ -135,7 +151,9 @@ void HttpServer::processWebSocketFrame(pbuf *buf, HttpServerConnection& connecti
 		msg.setString((char*)data, size);
 		debugf("WS: %s", msg.c_str());
 		if (sock && wsMessage) wsMessage(*sock, msg);
+#if ENABLE_CMD_EXECUTOR
 		if (sock && sock->commandExecutor) sock->commandExecutor->executorReceive(msg+"\r");
+#endif
 	}
 	else if (frameType == WS_BINARY_FRAME)
 	{
@@ -149,6 +167,10 @@ void HttpServer::processWebSocketFrame(pbuf *buf, HttpServerConnection& connecti
 		debugf("WS error reading frame: %X", frameType);
 	else
 		debugf("WS frame type: %X", frameType);
+
+	payloadShift += payloadLength + 6 + payloadFieldExtraBytes;
+	}
+	while (buf->len > payloadShift);
 }
 
 void HttpServer::setWebSocketConnectionHandler(WebSocketDelegate handler)

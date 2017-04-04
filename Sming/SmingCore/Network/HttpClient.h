@@ -61,6 +61,14 @@ public:
 
 	void reset(); // Reset current status, data and etc.
 
+#ifdef ENABLE_SSL
+	using TcpClient::addSslOptions;
+	using TcpClient::setSslFingerprint;
+	using TcpClient::setSslClientKeyCert;
+	using TcpClient::freeSslClientKeyCert;
+	using TcpClient::getSsl;
+#endif
+
 protected:
 	bool startDownload(URL uri, HttpClientMode mode, HttpClientCompletedDelegate onCompleted);
 	void onFinished(TcpClientState finishState);
