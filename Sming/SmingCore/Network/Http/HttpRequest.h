@@ -116,6 +116,8 @@ public:
 	HttpRequest* onBody(RequestBodyDelegate delegateFunction);
 	HttpRequest* onRequestComplete(RequestCompletedDelegate delegateFunction);
 
+	void reset();
+
 #ifndef SMING_RELEASE
 	/**
 	 * @brief Tries to present a readable version of the current request values
@@ -132,6 +134,8 @@ public:
 	HttpParams postParams;
 
 	int retries = 0; // how many times the request should be send again...
+
+	void *args = NULL; // Used to store data that should be valid during a single request
 
 protected:
 	RequestHeadersCompletedDelegate headersCompletedDelegate;

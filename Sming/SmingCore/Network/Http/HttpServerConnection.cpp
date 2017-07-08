@@ -3,6 +3,11 @@
  * Created 2015 by Skurydin Alexey
  * http://github.com/anakod/Sming
  * All files of the Sming Core are provided under the LGPL v3 license.
+ *
+ * HttpServerConnection
+ *
+ * Modified: 2017 - Slavey Karadzhov <slav@attachix.com>
+ *
  ****/
 
 #include "HttpServerConnection.h"
@@ -36,8 +41,14 @@ HttpServerConnection::~HttpServerConnection()
 {
 }
 
-void HttpServerConnection::setResourceTree(ResourceTree* resourceTree) {
+void HttpServerConnection::setResourceTree(ResourceTree* resourceTree)
+{
 	this->resourceTree = resourceTree;
+}
+
+void HttpServerConnection::setBodyParsers(BodyParsers* bodyParsers)
+{
+	this->bodyParsers = bodyParsers;
 }
 
 int HttpServerConnection::staticOnMessageBegin(http_parser* parser)
@@ -65,6 +76,7 @@ int HttpServerConnection::staticOnMessageBegin(http_parser* parser)
 
 	// and temp data...
 	connection->requestHeaders.clear();
+	connection->bodyParser = 0;
 
 	return 0;
 }
@@ -116,6 +128,10 @@ int HttpServerConnection::staticOnMessageComplete(http_parser* parser)
 		return 0;
 	}
 
+	if(connection->bodyParser) {
+		connection->bodyParser(connection->request, NULL, -2);
+	}
+
 	if(connection->resource != NULL && connection->resource->onRequestComplete) {
 		hasError = connection->resource->onRequestComplete(*connection, connection->request, connection->response);
 	}
@@ -157,12 +173,30 @@ int HttpServerConnection::staticOnHeadersComplete(http_parser* parser)
 	int error = 0;
 	connection->request.setHeaders(connection->requestHeaders);
 
+	connection->lastWasValue = true;
+	connection->lastData = "";
+	connection->currentField  = "";
+	connection->requestHeaders.clear();
+
 	if(connection->resource != NULL && connection->resource->onHeadersComplete) {
 		error = connection->resource->onHeadersComplete(*connection, connection->request, connection->response);
 	}
 
 	if(!error && connection->request.method == HTTP_HEAD) {
 		error = 1;
+	}
+
+	if(connection->request.headers.contains("Content-Type")) {
+		String contentType = connection->request.headers["Content-Type"];
+		int endPos = contentType.indexOf(';');
+		if(endPos != -1) {
+			contentType = contentType.substring(0, endPos);
+		}
+
+		if(connection->bodyParsers->contains(contentType)) {
+			connection->bodyParser = (*connection->bodyParsers)[contentType];
+			connection->bodyParser(connection->request, NULL, -1);
+		}
 	}
 
 	return error;
@@ -210,6 +244,10 @@ int HttpServerConnection::staticOnBody(http_parser *parser, const char *at, size
 	if (connection == NULL) {
 		// something went wrong
 		return -1;
+	}
+
+	if(connection->bodyParser) {
+		connection->bodyParser(connection->request, at, length);
 	}
 
 	if(connection->resource != NULL && connection->resource->onBody) {
@@ -371,6 +409,11 @@ void HttpServerConnection::onReadyToSendData(TcpConnectionEvent sourceEvent)
 
 	if(state == eHCS_Sent && response.headers["Connection"] == "close") {
 		setTimeOut(1); // decrease the timeout to 1 tick
+	}
+
+	if(state == eHCS_Sent) {
+		response.reset();
+		request.reset();
 	}
 
 	TcpClient::onReadyToSendData(sourceEvent);

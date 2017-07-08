@@ -57,6 +57,7 @@ bool HttpResponse::sendString(const String& text)
 {
 	MemoryDataStream* memStream = new MemoryDataStream();
 	if (memStream->write((const uint8_t*)text.c_str(), text.length()) != text.length()) {
+		delete memStream;
 		return false;
 	}
 
@@ -180,3 +181,11 @@ bool HttpResponse::sendDataStream( IDataSourceStream * newDataStream , String re
     return true;
 }
 
+void HttpResponse::reset()
+{
+	headers.clear();
+	if(stream != NULL) {
+		delete stream;
+		stream = NULL;
+	}
+}
