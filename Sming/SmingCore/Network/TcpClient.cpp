@@ -69,7 +69,7 @@ bool TcpClient::connect(IPAddress addr, uint16_t port, boolean useSsl /* = false
 	return TcpConnection::connect(addr, port, useSsl, sslOptions);
 }
 
-bool TcpClient::sendString(String data, bool forceCloseAfterSent /* = false*/)
+bool TcpClient::sendString(const String& data, bool forceCloseAfterSent /* = false*/)
 {
 	return send(data.c_str(), data.length(), forceCloseAfterSent);
 }
@@ -81,8 +81,11 @@ bool TcpClient::send(const char* data, uint16_t len, bool forceCloseAfterSent /*
 	if (stream == NULL)
 		stream = new MemoryDataStream();
 
-	if (stream->write((const uint8_t*)data, len) != len)
+	if (stream->write((const uint8_t*)data, len) != len) {
+		debug_e("ERROR: Unable to store %d bytes in output stream", len);
 		return false;
+	}
+
 	debugf("Storing %d bytes in stream", len);
 
 	asyncTotalLen += len;
