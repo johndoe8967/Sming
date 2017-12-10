@@ -179,19 +179,30 @@ endif
 # define your custom directories in the project's own Makefile before including this one
 MODULES      ?= app     # default to app if not set by user
 MODULES      += $(THIRD_PARTY_DIR)/rboot/appcode
+MODULES      += $(SMING_HOME)/appspecific/rboot
 EXTRA_INCDIR ?= include # default to include if not set by user
 
 ENABLE_CUSTOM_LWIP ?= 1
+LWIP_INCDIR = $(SMING_HOME)/system/esp-lwip/lwip/include
 ifeq ($(ENABLE_CUSTOM_LWIP), 1)
 	LWIP_INCDIR = $(SMING_HOME)/third-party/esp-open-lwip/include	
+else ifeq ($(ENABLE_CUSTOM_LWIP), 2)
+	LWIP_INCDIR = $(SMING_HOME)/third-party/lwip2/glue-esp/include-esp  $(SMING_HOME)/third-party/lwip2/include
 endif
 
-EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME)/system/include $(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include $(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
+EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME)/system/include \
+				$(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/Libraries/Adafruit_GFX \
+				$(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include \
+				$(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
 
 USER_LIBDIR  = $(SMING_HOME)/compiler/lib/
 
 # compiler flags using during compilation of source files
 CFLAGS		= -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 -DCOM_SPEED_SERIAL=$(COM_SPEED_SERIAL) $(USER_CFLAGS) -DENABLE_CMD_EXECUTOR=$(ENABLE_CMD_EXECUTOR)
+# => SDK
+ifneq (,$(findstring third-party/ESP8266_NONOS_SDK, $(SDK_BASE)))
+	CFLAGS += -DSDK_INTERNAL
+endif
 ifeq ($(SMING_RELEASE),1)
 	# See: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
 	#      for full list of optimization options
@@ -205,6 +216,10 @@ else
 	CFLAGS += -Os -g
 	STRIP := @true
 endif
+ifeq ($(ENABLE_WPS),1)
+   CFLAGS += -DENABLE_WPS=1
+endif
+
 #Append debug options
 CFLAGS  += -DCUST_FILE_BASE=$$* -DDEBUG_VERBOSE_LEVEL=$(DEBUG_VERBOSE_LEVEL) -DDEBUG_PRINT_FILENAME_AND_LINE=$(DEBUG_PRINT_FILENAME_AND_LINE)
 CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11 -felide-constructors
@@ -242,6 +257,13 @@ ifeq ($(ENABLE_CUSTOM_LWIP), 1)
 	endif
 	CUSTOM_TARGETS += $(USER_LIBDIR)/lib$(LIBLWIP).a
 endif
+ifeq ($(ENABLE_CUSTOM_LWIP), 2)
+	ifeq ($(ENABLE_ESPCONN), 1)
+$(error LWIP2 does not support espconn_* functions. Make sure to set ENABLE_CUSTOM_LWIP to 0 or 1.)
+	endif
+	LIBLWIP = lwip2
+	CUSTOM_TARGETS += $(USER_LIBDIR)/liblwip2.a
+endif
 
 LIBPWM = pwm
 
@@ -252,6 +274,9 @@ ifeq ($(ENABLE_CUSTOM_PWM), 1)
 endif
 
 LIBS		= microc microgcc hal phy pp net80211 $(LIBLWIP) wpa $(LIBMAIN) $(LIBSMING) crypto $(LIBPWM) smartconfig $(EXTRA_LIBS)
+ifeq ($(ENABLE_WPS),1)
+   LIBS += wps
+endif
 
 # SSL support using axTLS
 ifeq ($(ENABLE_SSL),1)
@@ -270,6 +295,9 @@ endif
 ifeq ($(ENABLE_CUSTOM_LWIP), 1)
 	EXTRA_INCDIR += third-party/esp-open-lwip/include
 endif
+ifeq ($(ENABLE_CUSTOM_LWIP), 2)
+	EXTRA_INCDIR += third-party/lwip2/include
+endif
 
 
 # we will use global WiFi settings from Eclipse Environment Variables, if possible
@@ -286,7 +314,7 @@ ifeq ($(DISABLE_SPIFFS), 1)
 endif
 
 # linker flags used to generate the main object file
-LDFLAGS		= -nostdlib -u call_user_start -u Cache_Read_Enable_New -Wl,-static -Wl,--gc-sections -Wl,-Map=$(basename $@).map -Wl,-wrap,system_restart_local 
+LDFLAGS		= -nostdlib -u call_user_start -u Cache_Read_Enable_New -u spiffs_get_storage_config -Wl,-static -Wl,--gc-sections -Wl,-Map=$(basename $@).map -Wl,-wrap,system_restart_local 
 
 ifeq ($(SPI_SPEED), 26)
 	flashimageoptions = -ff 26m
@@ -422,12 +450,20 @@ vpath %.c $(SRC_DIR)
 vpath %.cpp $(SRC_DIR)
 
 define compile-objects
-$1/%.o: %.c
+$1/%.o: %.c $1/%.c.d
 	$(vecho) "CC $$<"
 	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS) -c $$< -o $$@	
-$1/%.o: %.cpp
+$1/%.o: %.cpp $1/%.cpp.d
 	$(vecho) "C+ $$<" 
 	$(Q) $(CXX) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CXXFLAGS) -c $$< -o $$@
+$1/%.c.d: %.c
+	$(vecho) "DEP $$<"
+	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS) -MM -MT $1/$$*.o $$< -o $$@
+$1/%.cpp.d: %.cpp
+	$(vecho) "DEP $$<"
+	$(Q) $(CXX) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CXXFLAGS) -MM -MT $1/$$*.o $$< -o $$@
+
+.PRECIOUS: $1/%.c.d $1/%.cpp.d
 endef
 
 .PHONY: all checkdirs spiff_update spiff_clean clean
@@ -489,10 +525,10 @@ $(USER_LIBDIR)/libpwm_open.a:
 	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/libpwm_open.a ENABLE_CUSTOM_PWM=1
 endif
 
-ifeq ($(ENABLE_CUSTOM_LWIP), 1)
-$(USER_LIBDIR)/liblwip_%.a:
-	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/$(notdir $@) ENABLE_CUSTOM_LWIP=1 ENABLE_ESPCONN=$(ENABLE_ESPCONN)
-endif
+$(USER_LIBDIR)/liblwip%.a:
+	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/$(notdir $@) \
+				ENABLE_CUSTOM_LWIP=$(ENABLE_CUSTOM_LWIP) \
+				ENABLE_ESPCONN=$(ENABLE_ESPCONN)
 
 checkdirs: $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
 
@@ -527,10 +563,10 @@ flash: all
 	-$(Q) $(KILL_TERM)
 ifeq ($(DISABLE_SPIFFS), 1)
 # flashes rboot and first rom
-	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) 0x00000 $(RBOOT_BIN) 0x02000 $(RBOOT_ROM_0)
+	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) 0x00000 $(RBOOT_BIN) 0x01000 $(SDK_BASE)/bin/blank.bin 0x02000 $(RBOOT_ROM_0)
 else
 # flashes rboot, first rom and spiffs
-	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) 0x00000 $(RBOOT_BIN) 0x02000 $(RBOOT_ROM_0) $(RBOOT_SPIFFS_0) $(SPIFF_BIN_OUT)
+	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) 0x00000 $(RBOOT_BIN) 0x01000 $(SDK_BASE)/bin/blank.bin 0x02000 $(RBOOT_ROM_0) $(RBOOT_SPIFFS_0) $(SPIFF_BIN_OUT)
 endif
 	$(TERMINAL)
 
@@ -552,3 +588,5 @@ clean:
 	$(Q) rm -rf $(FW_BASE)
 
 $(foreach bdir,$(BUILD_DIR),$(eval $(call compile-objects,$(bdir))))
+$(foreach bdir,$(BUILD_DIR),$(eval include $(wildcard $(bdir)/*.c.d)))
+$(foreach bdir,$(BUILD_DIR),$(eval include $(wildcard $(bdir)/*.cpp.d)))

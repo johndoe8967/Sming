@@ -17,7 +17,7 @@ extern "C" {
 
 class WebSocketConnection;
 
-typedef Vector<WebSocketConnection> WebSocketsList;
+typedef Vector<WebSocketConnection*> WebSocketsList;
 
 typedef Delegate<void(WebSocketConnection&)> WebSocketDelegate;
 typedef Delegate<void(WebSocketConnection&, const String&)> WebSocketMessageDelegate;
@@ -29,6 +29,12 @@ enum WsConnectionState
 	eWSCS_Open,
 	eWSCS_Closed
 };
+
+typedef struct {
+	ws_frame_type_t type;
+	char* payload;
+	size_t payloadLegth;
+} WsFrameInfo;
 
 class WebSocketConnection
 {
@@ -84,14 +90,14 @@ private:
 	HttpServerConnection* connection = nullptr;
 
 	ws_frame_type_t frameType = WS_FRAME_TEXT;
-	ws_frame_type_t controlFrameType = WS_FRAME_PING;
+	WsFrameInfo controlFrame;
 
 	ws_parser_t parser;
 	ws_parser_callbacks_t parserSettings;
 
-// @deprecated
 	static WebSocketsList websocketList;
-// @end deprecated
+
+	EndlessMemoryStream* stream = NULL;
 };
 
 #endif /* SMINGCORE_NETWORK_WEBSOCKETCONNECTION_H_ */

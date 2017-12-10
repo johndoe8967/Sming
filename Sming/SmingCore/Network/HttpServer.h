@@ -49,11 +49,20 @@ public:
 	HttpServer(HttpServerSettings settings);
 	virtual ~HttpServer();
 
-	/*
+	/**
 	 * @brief Allows changing the server configuration
 	 */
 	void configure(HttpServerSettings settings);
 
+	/**
+	 * @briefs Allows content-type specific parsing of the body based on content-type.
+	 *
+	 * @param const String& contentType. Can be full content-type like 'application/json', or 'application/*'  or '*'.
+	 * 						If there is exact match for the content-type wildcard content-types will not be used.
+	 * 						There can be only one catch-all '*' body parser and that will be the last registered
+	 *
+	 * @param  HttpBodyParserDelegate parser
+	 */
 	void setBodyParser(const String& contentType, HttpBodyParserDelegate parser);
 
 	/**
@@ -68,10 +77,8 @@ public:
 	void setDefaultHandler(const HttpPathDelegate& callback);
 	void setDefaultResource(HttpResource* resource);
 
-
 protected:
 	virtual TcpConnection* createClient(tcp_pcb *clientTcp);
-	virtual void onConnectionClose(TcpClient& connection, bool success);
 
 protected:
 #ifdef ENABLE_SSL

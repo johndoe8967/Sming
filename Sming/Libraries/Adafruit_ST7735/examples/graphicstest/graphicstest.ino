@@ -30,7 +30,7 @@ as well as Adafruit raw 1.8" TFT display
 // These pins will also work for the 1.8" TFT shield
 #define TFT_CS     10
 #define TFT_RST    9  // you can also connect this to the Arduino reset
-                      // in which case, set this #define pin to 0!
+                      // in which case, set this #define pin to -1!
 #define TFT_DC     8
 
 // Option 1 (recommended): must use the hardware SPI pins
@@ -56,6 +56,9 @@ void setup(void) {
 
   // Use this initializer (uncomment) if you're using a 1.44" TFT
   //tft.initR(INITR_144GREENTAB);   // initialize a ST7735S chip, black tab
+
+  // Use this initializer (uncomment) if you're using a 0.96" 180x60 TFT
+  //tft.initR(INITR_MINI160x80);   // initialize a ST7735S chip, mini display
 
   Serial.println("Initialized");
 
@@ -208,7 +211,7 @@ void testtriangles() {
   int x = tft.height()-1;
   int y = 0;
   int z = tft.width();
-  for(t = 0 ; t <= 15; t+=1) {
+  for(t = 0 ; t <= 15; t++) {
     tft.drawTriangle(w, y, y, x, z, x, color);
     x-=4;
     y+=4;

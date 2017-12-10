@@ -98,10 +98,10 @@ void ShowInfo() {
 }
 
 void serialCallBack(Stream& stream, char arrivedChar, unsigned short availableCharsCount) {
-
-	if (arrivedChar == '\n') {
-		char str[availableCharsCount];
-		for (int i = 0; i < availableCharsCount; i++) {
+	int pos = stream.indexOf('\n');
+	if(pos > -1) {
+		char str[pos + 1];
+		for (int i = 0; i < pos + 1; i++) {
 			str[i] = stream.read();
 			if (str[i] == '\r' || str[i] == '\n') {
 				str[i] = '\0';
@@ -112,6 +112,7 @@ void serialCallBack(Stream& stream, char arrivedChar, unsigned short availableCh
 			// connect to wifi
 			WifiStation.config(WIFI_SSID, WIFI_PWD);
 			WifiStation.enable(true);
+			WifiStation.connect();
 		} else if (!strcmp(str, "ip")) {
 			Serial.printf("ip: %s mac: %s\r\n", WifiStation.getIP().toString().c_str(), WifiStation.getMAC().c_str());
 		} else if (!strcmp(str, "ota")) {

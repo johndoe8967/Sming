@@ -41,10 +41,10 @@ SPIFFY ?= $(SMING_HOME)/spiffy/spiffy
 
 #ESPTOOL2 config to generate rBootLESS images
 IMAGE_MAIN	?= 0x00000.bin
-IMAGE_SDK	?= 0x0a000.bin # The name must match the starting address of the irom0 section 
-						   # in the LD file ($SMING_HOME/compiler/ld/standalone.rom.ld).
-						   # To calculate the value do the following: x = irom0_0_seg.org - 0x40200000
-						   # Example: 0x4020a000 - 0x40200000 = 0x0a000
+IMAGE_SDK_OFFSET = $(shell printf '0x%x\n' $$(( ($$($(GET_FILESIZE) $(FW_BASE)/$(IMAGE_MAIN)) + 0x1000 + $(basename $(IMAGE_MAIN))) & (0xFFFFF000) )) )
+IMAGE_SDK	?= $(IMAGE_SDK_OFFSET).bin
+IROM0_ORG0       = $(shell printf '0x%x\n' $$(( 0x40200000 + $(IMAGE_SDK_OFFSET))) )
+
 INIT_BIN_ADDR =  0x7c000
 BLANK_BIN_ADDR =  0x4b000
 
@@ -54,6 +54,9 @@ ESPTOOL2 ?= esptool2
 ESPTOOL2_SECTS		?= .text .data .rodata
 ESPTOOL2_MAIN_ARGS	?= -quiet -bin -boot0
 ESPTOOL2_SDK_ARGS	?= -quiet -lib
+
+# SED path
+SED     ?= sed
 
 ## ESP_HOME sets the path where ESP tools and SDK are located.
 ## Windows:
@@ -171,11 +174,17 @@ MODULES      ?= app     # default to app if not set by user
 EXTRA_INCDIR ?= include # default to include if not set by user
 
 ENABLE_CUSTOM_LWIP ?= 1
+LWIP_INCDIR = $(SMING_HOME)/system/esp-lwip/lwip/include
 ifeq ($(ENABLE_CUSTOM_LWIP), 1)
 	LWIP_INCDIR = $(SMING_HOME)/third-party/esp-open-lwip/include	
+else ifeq ($(ENABLE_CUSTOM_LWIP), 2)
+	LWIP_INCDIR = $(SMING_HOME)/third-party/lwip2/glue-esp/include-esp  $(SMING_HOME)/third-party/lwip2/include
 endif
 
-EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME)/system/include $(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include $(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
+EXTRA_INCDIR += $(SMING_HOME)/include $(SMING_HOME)/ $(LWIP_INCDIR) $(SMING_HOME)/system/include \
+				$(SMING_HOME)/Wiring $(SMING_HOME)/Libraries $(SMING_HOME)/Libraries/Adafruit_GFX \
+				$(SMING_HOME)/SmingCore $(SMING_HOME)/Services/SpifFS $(SDK_BASE)/../include \
+				$(THIRD_PARTY_DIR)/rboot $(THIRD_PARTY_DIR)/rboot/appcode $(THIRD_PARTY_DIR)/spiffs/src
 
 ENABLE_CUSTOM_HEAP ?= 0
  
@@ -194,6 +203,13 @@ ifeq ($(ENABLE_CUSTOM_LWIP), 1)
 	endif
 	CUSTOM_TARGETS += $(USER_LIBDIR)/lib$(LIBLWIP).a 
 endif
+ifeq ($(ENABLE_CUSTOM_LWIP), 2)
+	ifeq ($(ENABLE_ESPCONN), 1)
+$(error LWIP2 does not support espconn_* functions. Make sure to set ENABLE_CUSTOM_LWIP to 0 or 1.)
+	endif
+	LIBLWIP = lwip2
+	CUSTOM_TARGETS += $(USER_LIBDIR)/liblwip2.a 
+endif
 
 LIBPWM = pwm
 
@@ -205,9 +221,16 @@ endif
 
 # libraries used in this project, mainly provided by the SDK
 LIBS		= microc microgcc hal phy pp net80211 $(LIBLWIP) wpa $(LIBMAIN) $(LIBSMING) crypto $(LIBPWM) smartconfig $(EXTRA_LIBS)
+ifeq ($(ENABLE_WPS),1)
+	LIBS += wps
+endif
 
 # compiler flags using during compilation of source files
 CFLAGS		= -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106 -DCOM_SPEED_SERIAL=$(COM_SPEED_SERIAL) $(USER_CFLAGS) -DENABLE_CMD_EXECUTOR=$(ENABLE_CMD_EXECUTOR)
+# => SDK
+ifneq (,$(findstring third-party/ESP8266_NONOS_SDK, $(SDK_BASE)))
+	CFLAGS += -DSDK_INTERNAL
+endif
 ifeq ($(SMING_RELEASE),1)
 	# See: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
 	#      for full list of optimization options
@@ -220,6 +243,9 @@ else ifeq ($(ENABLE_GDB), 1)
 else
 	CFLAGS += -Os -g
 	STRIP := @true
+endif
+ifeq ($(ENABLE_WPS),1)
+	CFLAGS += -DENABLE_WPS=1
 endif
 
 #Append debug options
@@ -259,6 +285,8 @@ LDFLAGS		= -nostdlib -u call_user_start -Wl,-static -Wl,--gc-sections -Wl,-Map=$
 
 # linker script used for the above linkier step
 LD_PATH     = $(SMING_HOME)/compiler/ld
+PROJECT_LD_PATH=ld
+
 LD_SCRIPT	= standalone.rom.ld
 
 ifeq ($(SPI_SPEED), 26)
@@ -353,12 +381,20 @@ vpath %.c $(SRC_DIR)
 vpath %.cpp $(SRC_DIR)
 
 define compile-objects
-$1/%.o: %.c
+$1/%.o: %.c $1/%.c.d
 	$(vecho) "CC $$<"
 	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS) -c $$< -o $$@	
-$1/%.o: %.cpp
+$1/%.o: %.cpp $1/%.cpp.d
 	$(vecho) "C+ $$<" 
 	$(Q) $(CXX) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CXXFLAGS) -c $$< -o $$@
+$1/%.c.d: %.c
+	$(vecho) "DEP $$<"
+	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS) -MM -MT $1/$$*.o $$< -o $$@
+$1/%.cpp.d: %.cpp
+	$(vecho) "DEP $$<"
+	$(Q) $(CXX) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CXXFLAGS) -MM -MT $1/$$*.o $$< -o $$@
+
+.PRECIOUS: $1/%.c.d $1/%.cpp.d
 endef
 
 .PHONY: all checkdirs spiff_update spiff_clean clean
@@ -367,9 +403,28 @@ all: $(USER_LIBDIR)/lib$(LIBSMING).a checkdirs $(TARGET_OUT) $(SPIFF_BIN_OUT) $(
 
 spiff_update: spiff_clean $(SPIFF_BIN_OUT)
 
-$(TARGET_OUT): $(APP_AR)
-	$(vecho) "LD $@"	
-	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(LD_PATH) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $(APP_AR) -Wl,--end-group -o $@
+$(PROJECT_LD_PATH)/$(LD_SCRIPT):
+	$(Q) mkdir -p $(PROJECT_LD_PATH)
+	$(Q) cp $(LD_PATH)/$(LD_SCRIPT) $@ 
+	
+$(FW_BASE)/$(IMAGE_MAIN): $(APP_AR)
+# Pass 1: Generate rom0 to be able to check its size
+	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(LD_PATH) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $(APP_AR) -Wl,--end-group -o $(TARGET_OUT).tmp
+	
+	$(Q) $(STRIP) $(TARGET_OUT).tmp
+
+	$(Q) $(ESPTOOL2) $(ESPTOOL2_MAIN_ARGS) $(TARGET_OUT).tmp $@ $(ESPTOOL2_SECTS)
+	
+	$(Q) rm $(TARGET_OUT).tmp
+
+$(TARGET_OUT): $(FW_BASE)/$(IMAGE_MAIN) $(PROJECT_LD_PATH)/$(LD_SCRIPT)
+	$(vecho) "LD $@"
+	
+# Readjust linker
+	$(Q) $(SED) -r "s/(^\s*irom0_0_seg *: *).*/\\1org = $(IROM0_ORG0), len = \(1M - $(IMAGE_SDK_OFFSET)\)/" $(LD_PATH)/$(LD_SCRIPT) > $(PROJECT_LD_PATH)/$(LD_SCRIPT)
+	
+# Pass 2: Generate roms with correct offsets
+	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) -L$(PROJECT_LD_PATH) -L$(LD_PATH) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $(APP_AR) -Wl,--end-group -o $@
 
 	$(Q) $(STRIP) $@
 
@@ -416,10 +471,10 @@ $(USER_LIBDIR)/libpwm_open.a:
 	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/libpwm_open.a ENABLE_CUSTOM_PWM=1
 endif
 
-ifeq ($(ENABLE_CUSTOM_LWIP), 1)
-$(USER_LIBDIR)/liblwip_%.a:
-	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/$(notdir $@) ENABLE_CUSTOM_LWIP=1 ENABLE_ESPCONN=$(ENABLE_ESPCONN)
-endif
+$(USER_LIBDIR)/liblwip%.a:
+	$(Q) $(MAKE) -C $(SMING_HOME) compiler/lib/$(notdir $@) \
+				ENABLE_CUSTOM_LWIP=$(ENABLE_CUSTOM_LWIP) \
+				ENABLE_ESPCONN=$(ENABLE_ESPCONN)
 
 checkdirs: $(BUILD_DIR) $(FW_BASE) $(CUSTOM_TARGETS)
 
@@ -454,9 +509,9 @@ flash: all
 	$(vecho) "Killing Terminal to free $(COM_PORT)"
 	-$(Q) $(KILL_TERM)
 ifeq ($(DISABLE_SPIFFS), 1)
-	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) $(basename $(IMAGE_MAIN)) $(FW_BASE)/$(IMAGE_MAIN) $(basename $(IMAGE_SDK)) $(FW_BASE)/$(IMAGE_SDK)
+	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) $(basename $(IMAGE_MAIN)) $(FW_BASE)/$(IMAGE_MAIN) $(IMAGE_SDK_OFFSET) $(FW_BASE)/$(IMAGE_SDK)
 else
-	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) $(basename $(IMAGE_MAIN)) $(FW_BASE)/$(IMAGE_MAIN) $(basename $(IMAGE_SDK)) $(FW_BASE)/$(IMAGE_SDK) $(SPIFF_START_OFFSET) $(SPIFF_BIN_OUT)
+	$(ESPTOOL) -p $(COM_PORT) -b $(COM_SPEED_ESPTOOL) write_flash $(flashimageoptions) $(basename $(IMAGE_MAIN)) $(FW_BASE)/$(IMAGE_MAIN) $(IMAGE_SDK_OFFSET) $(FW_BASE)/$(IMAGE_SDK) $(SPIFF_START_OFFSET) $(SPIFF_BIN_OUT)
 endif
 	$(TERMINAL)
 
@@ -485,3 +540,5 @@ clean:
 	$(Q) rm -rf $(FW_BASE)
 
 $(foreach bdir,$(BUILD_DIR),$(eval $(call compile-objects,$(bdir))))
+$(foreach bdir,$(BUILD_DIR),$(eval include $(wildcard $(bdir)/*.c.d)))
+$(foreach bdir,$(BUILD_DIR),$(eval include $(wildcard $(bdir)/*.cpp.d)))
