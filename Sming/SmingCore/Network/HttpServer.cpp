@@ -55,7 +55,7 @@ void HttpServer::addPath(String path, HttpPathDelegate callback)
 		path = path.substring(0, path.length() - 1);
 	if (!path.startsWith("/"))
 		path = "/" + path;
-	debugf("'%s' registered", path.c_str());
+//	debugf("'%s' registered", path.c_str());
 	paths[path] = callback;
 }
 

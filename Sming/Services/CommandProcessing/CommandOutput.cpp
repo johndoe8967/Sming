@@ -24,7 +24,7 @@ CommandOutput::CommandOutput(WebSocket* reqSocket)
 
 CommandOutput::~CommandOutput()
 {
-	debugf("destruct");
+//	debugf("destruct");
 }
 
 size_t CommandOutput::write(uint8_t outChar)

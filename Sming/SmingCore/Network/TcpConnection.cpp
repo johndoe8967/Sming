@@ -27,7 +27,7 @@ TcpConnection::~TcpConnection()
 {
 	autoSelfDestruct = false;
 	close();
-	debugf("~TCP connection");
+//	debugf("~TCP connection");
 }
 
 bool TcpConnection::connect(String server, int port)
@@ -37,7 +37,7 @@ bool TcpConnection::connect(String server, int port)
 
 	ip_addr_t addr;
 
-	debugf("connect to: %s", server.c_str());
+//	debugf("connect to: %s", server.c_str());
 	canSend = false; // Wait for connection
 	DnsLookup *look = new DnsLookup { this, port };
 	err_t dnslook = dns_gethostbyname(server.c_str(), &addr, staticDnsResponse, look);
@@ -63,17 +63,17 @@ bool TcpConnection::connect(IPAddress addr, uint16_t port)
 
 void TcpConnection::setTimeOut(uint16_t waitTimeOut)
 {
-	debugf("timeout updating: %d -> %d", timeOut, waitTimeOut);
+//	debugf("timeout updating: %d -> %d", timeOut, waitTimeOut);
 	timeOut = waitTimeOut;
 }
 
 err_t TcpConnection::onReceive(pbuf *buf)
 {
-	if (buf == NULL)
+/*	if (buf == NULL)
 		debugf("TCP received: (null)");
 	else
 		debugf("TCP received: %d bytes", buf->tot_len);
-
+*/
 	if (buf != NULL && getAvailableWriteSize() > 0)
 		onReadyToSendData(eTCE_Received);
 
@@ -82,7 +82,7 @@ err_t TcpConnection::onReceive(pbuf *buf)
 
 err_t TcpConnection::onSent(uint16_t len)
 {
-	debugf("TCP sent: %d", len);
+//	debugf("TCP sent: %d", len);
 
 	//debugf("%d %d", tcp->state, tcp->flags); // WRONG!
 	if (len >= 0 && tcp != NULL && getAvailableWriteSize() > 0)
@@ -95,7 +95,7 @@ err_t TcpConnection::onPoll()
 {
 	if (sleep >= timeOut && timeOut != USHRT_MAX)
 	{
-		debugf("TCP connection closed by timeout: %d (from %d)", sleep, timeOut);
+//		debugf("TCP connection closed by timeout: %d (from %d)", sleep, timeOut);
 
 		close();
 		return ERR_TIMEOUT;
@@ -109,11 +109,11 @@ err_t TcpConnection::onPoll()
 
 err_t TcpConnection::onConnected(err_t err)
 {
-	if (err != ERR_OK)
+/*	if (err != ERR_OK)
 		debugf("TCP connected error status: %d", err);
 	else
 		debugf("TCP connected");
-
+*/
 	canSend = true;
 	if (err == ERR_OK)
 		onReadyToSendData(eTCE_Connected);
@@ -125,12 +125,12 @@ err_t TcpConnection::onConnected(err_t err)
 
 void TcpConnection::onError(err_t err)
 {
-	debugf("TCP connection error: %d", err);
+//	debugf("TCP connection error: %d", err);
 }
 
 void TcpConnection::onReadyToSendData(TcpConnectionEvent sourceEvent)
 {
-	if (sourceEvent != eTCE_Poll) debugf("onReadyToSendData: %d", sourceEvent);
+//	if (sourceEvent != eTCE_Poll) debugf("onReadyToSendData: %d", sourceEvent);
 }
 
 int TcpConnection::writeString(const String data, uint8_t apiflags /* = TCP_WRITE_FLAG_COPY*/)
@@ -183,7 +183,7 @@ int TcpConnection::write(IDataSourceStream* stream)
 		space = (tcp_sndqueuelen(tcp) < TCP_SND_QUEUELEN);
 		if (!space)
 		{
-			debugf("WAIT FOR FREE SPACE");
+//			debugf("WAIT FOR FREE SPACE");
 			flush();
 			break; // don't try to send buffers if no free space available
 		}
@@ -220,7 +220,7 @@ int TcpConnection::write(IDataSourceStream* stream)
 void TcpConnection::close()
 {
 	if (tcp == NULL) return;
-	debugf("TCP connection closing");
+//	debugf("TCP connection closing");
 
 	tcp_poll(tcp, staticOnPoll, 1);
 	tcp_arg(tcp, NULL); // reset pointer to close connection on next callback
@@ -241,7 +241,7 @@ void TcpConnection::initialize(tcp_pcb* pcb)
 	tcp_poll(tcp, staticOnPoll, 4);
 
 	#ifdef NETWORK_DEBUG
-	debugf("+TCP connection");
+//	debugf("+TCP connection");
 	#endif
 }
 
@@ -249,7 +249,7 @@ void TcpConnection::closeTcpConnection(tcp_pcb *tpcb)
 {
 	if (tpcb == NULL) return;
 
-	debugf("-TCP connection");
+//	debugf("-TCP connection");
 
 	tcp_arg(tpcb, NULL);
 	tcp_sent(tpcb, NULL);
@@ -261,7 +261,7 @@ void TcpConnection::closeTcpConnection(tcp_pcb *tpcb)
 	auto err = tcp_close(tpcb);
 	if (err != ERR_OK)
 	{
-		debugf("tcp wait close connection");
+//		debugf("tcp wait close connection");
 		/* error closing, try again later in poll */
 		tcp_poll(tpcb, staticOnPoll, 4);
 	}
@@ -280,7 +280,7 @@ bool TcpConnection::internalTcpConnect(IPAddress addr, uint16_t port)
 {
 	NetUtils::FixNetworkRouting();
 	err_t res = tcp_connect(tcp, addr, port, staticOnConnected);
-	debugf("TcpConnection::connect result:, %d", res);
+//	debugf("TcpConnection::connect result:, %d", res);
 	return res == ERR_OK;
 }
 
@@ -289,13 +289,13 @@ err_t TcpConnection::staticOnConnected(void *arg, tcp_pcb *tcp, err_t err)
 	TcpConnection* con = (TcpConnection*)arg;
 	if (con == NULL)
 	{
-		debugf("OnConnected ABORT");
+//		debugf("OnConnected ABORT");
 		//closeTcpConnection(tcp);
 		tcp_abort(tcp);
 		return ERR_ABRT;
 	}
-	else
-		debugf("OnConnected");
+//	else
+//		debugf("OnConnected");
 
 	err_t res = con->onConnected(err);
 	con->checkSelfFree();
@@ -325,7 +325,7 @@ err_t TcpConnection::staticOnReceive(void *arg, tcp_pcb *tcp, pbuf *p, err_t err
 
 	if (err != ERR_OK /*&& err != ERR_CLSD && err != ERR_RST*/)
 	{
-		debugf("Received ERROR %d", err);
+//		debugf("Received ERROR %d", err);
 		/* exit and free resources, for unkown reason */
 		if (p != NULL)
 		{
@@ -414,15 +414,15 @@ void TcpConnection::staticDnsResponse(const char *name, ip_addr_t *ipaddr, void 
 	if (ipaddr != NULL)
 	{
 		IPAddress ip = *ipaddr;
-		debugf("DNS record found: %s = %d.%d.%d.%d",
-				name, ip[0], ip[1], ip[2], ip[3]);
+//		debugf("DNS record found: %s = %d.%d.%d.%d",
+//				name, ip[0], ip[1], ip[2], ip[3]);
 
 		dlook->con->internalTcpConnect(ip, dlook->port);
 	}
 	else
 	{
 		#ifdef NETWORK_DEBUG
-		debugf("DNS record _not_ found: %s", name);
+//		debugf("DNS record _not_ found: %s", name);
 		#endif
 
 		closeTcpConnection(dlook->con->tcp);

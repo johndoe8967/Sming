@@ -55,7 +55,7 @@ bool StationClass::config(String ssid, String password, bool autoConnectOnStartu
 	wifi_station_disconnect();
 	if (dhcp) enableDHCP(false);
 	bool cfgreaded = wifi_station_get_config(&config);
-	if (!cfgreaded) debugf("Can't read station configuration!");
+//	if (!cfgreaded) debugf("Can't read station configuration!");
 
 	memset(config.ssid, 0, sizeof(config.ssid));
 	memset(config.password, 0, sizeof(config.password));
@@ -67,13 +67,13 @@ bool StationClass::config(String ssid, String password, bool autoConnectOnStartu
 	if(!wifi_station_set_config(&config))
 	{
 		interrupts();
-		debugf("Can't set station configuration!");
+//		debugf("Can't set station configuration!");
 		wifi_station_connect();
 		enableDHCP(dhcp);
 		enable(enabled);
 		return false;
 	}
-	debugf("Station configuration was updated to: %s", ssid.c_str());
+//	debugf("Station configuration was updated to: %s", ssid.c_str());
 
 	interrupts();
 	wifi_station_connect();
@@ -187,7 +187,7 @@ bool StationClass::setIP(IPAddress address, IPAddress netmask, IPAddress gateway
 {
 	if (System.isReady())
 	{
-		debugf("IP can be changed only in init() method");
+//		debugf("IP can be changed only in init() method");
 		return false;
 	}
 
@@ -198,11 +198,11 @@ bool StationClass::setIP(IPAddress address, IPAddress netmask, IPAddress gateway
 	ipinfo.ip = address;
 	ipinfo.netmask = netmask;
 	ipinfo.gw = gateway;
-	if (wifi_set_ip_info(STATION_IF, &ipinfo))
-		debugf("AP IP succesfully updated");
-	else
+	if (wifi_set_ip_info(STATION_IF, &ipinfo)) {
+//		debugf("AP IP succesfully updated");
+	} else
 	{
-		debugf("AP IP can't be updated");
+//		debugf("AP IP can't be updated");
 		enableDHCP(true);
 	}
 	wifi_station_connect();
@@ -215,23 +215,23 @@ String StationClass::getSSID()
 	station_config config = {0};
 	if (!wifi_station_get_config(&config))
 	{
-		debugf("Can't read station configuration!");
+//		debugf("Can't read station configuration!");
 		return "";
 	}
-	debugf("SSID: %s", (char*)config.ssid);
+//	debugf("SSID: %s", (char*)config.ssid);
 	return String((char*)config.ssid);
 }
 
 
 sint8 StationClass::getRssi()
 {
-	debugf("Rssi: %d dBm", wifi_station_get_rssi());
+//	debugf("Rssi: %d dBm", wifi_station_get_rssi());
 	return wifi_station_get_rssi();
 }
 
 uint8 StationClass::getChannel()
 {
-	debugf("Channel: %d CH", wifi_get_channel());
+//	debugf("Channel: %d CH", wifi_get_channel());
 	return wifi_get_channel();
 }
  
@@ -242,10 +242,10 @@ String StationClass::getPassword()
 	station_config config = {0};
 	if (!wifi_station_get_config(&config))
 	{
-		debugf("Can't read station configuration!");
+//		debugf("Can't read station configuration!");
 		return "";
 	}
-	debugf("Pass: %s", (char*)config.password);
+//	debugf("Pass: %s", (char*)config.password);
 	return String((char*)config.password);
 }
 
@@ -268,7 +268,7 @@ bool StationClass::startScan(ScanCompletedDelegate scanCompleted)
 			runScan = true;
 			return true;
 		}
-		debugf("startScan failed");
+//		debugf("startScan failed");
 	}
 	return res;
 }
@@ -313,11 +313,11 @@ void StationClass::staticScanCompleted(void *arg, STATUS status)
 			WifiStation.scanCompletedCallback(true, list);
 		}
 
-		debugf("scan completed: %d found", list.count());
+//		debugf("scan completed: %d found", list.count());
 	}
 	else
 	{
-		debugf("scan failed %d", status);
+//		debugf("scan failed %d", status);
 		if (WifiStation.scanCompletedCallback )
 			WifiStation.scanCompletedCallback(false, list);
 	}
@@ -404,17 +404,17 @@ void StationClass::internalSmartConfig(sc_status status, void *pdata) {
 
 	switch (status) {
 		case SC_STATUS_WAIT:
-			debugf("SC_STATUS_WAIT\n");
+//			debugf("SC_STATUS_WAIT\n");
 			break;
 		case SC_STATUS_FIND_CHANNEL:
-			debugf("SC_STATUS_FIND_CHANNEL\n");
+//			debugf("SC_STATUS_FIND_CHANNEL\n");
 			break;
 		case SC_STATUS_GETTING_SSID_PSWD:
-			debugf("SC_STATUS_GETTING_SSID_PSWD\n");
+//			debugf("SC_STATUS_GETTING_SSID_PSWD\n");
 			break;
 		case SC_STATUS_LINK:
 			{
-				debugf("SC_STATUS_LINK\n");
+//				debugf("SC_STATUS_LINK\n");
 				station_config *sta_conf = (station_config *)pdata;
 				char *ssid = (char*)sta_conf->ssid;
 				char *password = (char*)sta_conf->password;
@@ -422,7 +422,7 @@ void StationClass::internalSmartConfig(sc_status status, void *pdata) {
 			}
 			break;
 		case SC_STATUS_LINK_OVER:
-			debugf("SC_STATUS_LINK_OVER\n");
+//			debugf("SC_STATUS_LINK_OVER\n");
 			smartConfigStop();
 			break;
 	}

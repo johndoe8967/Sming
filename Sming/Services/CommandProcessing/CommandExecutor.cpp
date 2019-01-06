@@ -104,7 +104,7 @@ int CommandExecutor::executorReceive(char recvChar)
 
 void CommandExecutor::processCommandLine(String cmdString)
 {
-	debugf("Received full Command line, size = %d,cmd = %s",cmdString.length(),cmdString.c_str());
+//	debugf("Received full Command line, size = %d,cmd = %s",cmdString.length(),cmdString.c_str());
 	String cmdCommand;
 	int cmdLen = cmdString.indexOf(' ');
 	if (cmdLen == -1)
@@ -116,7 +116,7 @@ void CommandExecutor::processCommandLine(String cmdString)
 		cmdCommand = cmdString.substring(0,cmdLen);
 	}
 
-	debugf("CommandExecutor : executing command %s",cmdCommand.c_str());
+//	debugf("CommandExecutor : executing command %s",cmdCommand.c_str());
 
 	CommandDelegate cmdDelegate = commandHandler.getCommandDelegate(cmdCommand);
 

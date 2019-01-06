@@ -49,7 +49,7 @@ size_t MemoryDataStream::write(const uint8_t* data, size_t len)
 		if (required > capacity)
 		{
 			capacity = required < 256 ? required + 128 : required + 64;
-			debugf("realloc %d -> %d", size, capacity);
+//			debugf("realloc %d -> %d", size, capacity);
 			char * new_buf;
 			//realloc can fail, store the result in temporary pointer
 			new_buf = (char*)realloc(buf, capacity);

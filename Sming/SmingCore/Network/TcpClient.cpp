@@ -170,7 +170,7 @@ void TcpClient::pushAsyncPart()
 	if (stream->isFinished())
 	{
 		flush();
-		debugf("TcpClient request completed");
+//		debugf("TcpClient request completed");
 		delete stream; // Free memory now!
 		stream = NULL;
 	}

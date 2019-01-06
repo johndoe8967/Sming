@@ -48,7 +48,7 @@ bool HttpClient::downloadFile(String url, String saveFileName, HttpClientComplet
 		file = saveFileName;
 
 	saveFile = fileOpen(file.c_str(), eFO_CreateNewAlways | eFO_WriteOnly);
-	debugf("Download file: %s %d", file.c_str(), saveFile);
+//	debugf("Download file: %s %d", file.c_str(), saveFile);
 
 	return startDownload(uri, eHCM_File, onCompleted);
 }
@@ -60,7 +60,7 @@ bool HttpClient::startDownload(URL uri, HttpClientMode mode, HttpClientCompleted
 	this->onCompleted = onCompleted;
 
 	if (uri.Protocol != "http") return false;
-	debugf("Download: %s", uri.toString().c_str());
+//	debugf("Download: %s", uri.toString().c_str());
 
 	connect(uri.Host, uri.Port);
 	bool isPost = body.length();
@@ -150,7 +150,7 @@ void HttpClient::onFinished(TcpClientState finishState)
 
 	if (mode == eHCM_File)
 	{
-		debugf("Download file len written: %d, res^ %d", fileTell(saveFile), isSuccessful());
+//		debugf("Download file len written: %d, res^ %d", fileTell(saveFile), isSuccessful());
 		if (!isSuccessful())
 			fileDelete(saveFile);
 		fileClose(saveFile);
@@ -181,7 +181,7 @@ void HttpClient::parseHeaders(pbuf* buf, int headerEnd)
 							nextLine - (delim + 1));
 					value.trim();
 					responseHeaders[name] = value;
-					debugf("%s === %s", name.c_str(), value.c_str());
+//					debugf("%s === %s", name.c_str(), value.c_str());
 				}
 			}
 		}
@@ -247,7 +247,7 @@ err_t HttpClient::onReceive(pbuf *buf)
 			int headerEnd = NetUtils::pbufFindStr(buf, "\r\n\r\n");
 			if (headerEnd != -1)
 			{
-				debugf("Header pos: %d", headerEnd);
+//				debugf("Header pos: %d", headerEnd);
 				startPos = headerEnd + 4;
 				waitParse = false;
 				if (headerEnd < NETWORK_MAX_HTTP_PARSING_LEN)
