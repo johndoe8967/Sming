@@ -22,7 +22,7 @@ void SystemClockClass::setTime(time_t time, TimeZone timeType /* = eTZ_Local */)
 {
 	bool timeSet =
 	(timeType == eTZ_UTC) ?	RTC.setRtcSeconds((time + (timezoneDiff * SECS_PER_HOUR))) : RTC.setRtcSeconds(time);
-	debugf("time updated? %d", timeSet);
+//	debugf("time updated? %d", timeSet);
 	status = eSCS_Set;
 }
 
