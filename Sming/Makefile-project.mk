@@ -207,7 +207,7 @@ else ifeq ($(SPI_SIZE), 4M)
 	SPIFF_SIZE ?= 524288  #512K
 else
 	flashimageoptions += -fs 4m
-	SPIFF_SIZE ?= 196608  #192K
+	SPIFF_SIZE ?= 131072  #192K
 endif
 
 # various paths from the SDK used in this project
